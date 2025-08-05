@@ -11,19 +11,31 @@ import getopt
 import re
 
 base_url = "https://netrunnerdb.com/api/2.0/public/decklist/"
+runner_back = "../nsg-runner.tiff"
+corp_back = "../nsg-corp.tiff"
+
 resize_height = 346
 resize_width = 243
 usage = 'ANRProxyGenerator.py -d <deck id>'
 
+back_path = ""
 
 def main(argv):
     deck_id = -1
     try:
-        opts, args = getopt.getopt(argv, 'd:', ["deckid="]) #Get the deck id from the command line
+        opts, args = getopt.getopt(argv, 'd:b:rc', ["deckid=","back="]) #Get the deck id from the command line
+
+        back = "../nsg-runner.tiff"
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
                 deck_id = arg
+            elif opt in ("-r"):
+                back_path = runner_back
+            elif opt in ("-c"):
+                back_path = corp_back
+            elif opt in ("-b", "--back"):
+                back = arg
             else:
                 print ("Unsupported argument found!")
 
