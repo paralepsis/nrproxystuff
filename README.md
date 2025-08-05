@@ -8,6 +8,10 @@ That code is also MIT licensed.
 
 conda create python=3.10 requests pillow psutil
 
+## ICC Files
+Found here:
+- https://www.eci.org/doku.php?id=en:downloads
+
 ## Card Backs
 I found some online. Converted to correct format with something like this:
 ```
