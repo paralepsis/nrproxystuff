@@ -8,6 +8,7 @@ import time
 import math
 import sys
 import getopt
+import re
 
 base_url = "https://netrunnerdb.com/api/2.0/public/decklist/"
 resize_height = 346
@@ -28,26 +29,43 @@ def main(argv):
 
         with requests.Session() as session:
 
-            print_memory_usage()
+            # print_memory_usage()
             decklist_url = base_url + str(deck_id)
             print(decklist_url)
             deck_response = session.get(decklist_url)
-            print_memory_usage()
+            # print_memory_usage()
 
             if deck_response.status_code == 200:
                 deck_data = deck_response.json()
-                proxy_list = []
+                card_nr = 1 # count for printing purposes, 0 reserved for identity
+
                 for card_id, number in deck_data['data'][0]['cards'].items():
                     #card_picture = session.get("http://netrunnerdb.com/card_image/" + card_id + ".png")
                     with session.get(f"http://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
-                        print_memory_usage()
+                        # print_memory_usage()
                         if card_response.status_code == 200:
                             card_json = card_response.json()
                             card_data = card_json['data'][0]
-                            print(card_data)
-                            print(f"{number} x {card_data['title']} ({card_data['type_code']})")
+                            # print(card_data)
+                            print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
+                            sanitized_title = sanitize_filename(card_data['stripped_title'])
+                            tmp_name = "./foo.tiff"
+                            # get_card_front(card_id, session, tmp_name)
 
-                            # get_card_front(card_id, session)
+                            if card_data['type_code'] == "identity":
+                                output_name = f"00_back.tiff"
+                                print(f"  {output_name}")
+                                output_name = f"00_{sanitized_title}.tiff"
+                                print(f"  {output_name}")
+
+                            else:
+                                for i in range(number):
+                                    output_name = f"{card_nr:02d}_{i}_back.tiff"
+                                    print(f"  {output_name}")
+                                    output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
+                                    print(f"  {output_name}")
+                                    card_nr += 1
+
                     time.sleep(3)
 
 
@@ -60,7 +78,7 @@ def main(argv):
         print(usage)
         sys.exit(2)
 
-def get_card_front(card_id, session):
+def get_card_front(card_id, session, output_path):
     print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
     image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
     if image_response.status_code == 200:
@@ -75,7 +93,7 @@ def get_card_front(card_id, session):
         # image_cmyk = image_resized.convert("CMYK")
         # image_cmyk.save("./foo.tiff", format="TIFF", dpi=dpi)
 
-        convert_to_cmyk_icc("./foo.jpg", "./foo.tiff")
+        convert_to_cmyk_icc("./foo.jpg", output_path)
         return True
     return False
 
@@ -95,6 +113,10 @@ def convert_to_cmyk_icc(input_path, output_path):
     ], check=True)
 
     return
+
+def sanitize_filename(s):
+    # Replace all non-alphanumeric, non-underscore, non-dash characters with "_"
+    return re.sub(r'[^a-zA-Z0-9_-]+', '_', s).strip('_')
 
 def print_memory_usage(note=""):
     process = psutil.Process(os.getpid())
