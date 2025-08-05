@@ -1,4 +1,5 @@
 import requests
+import shutil
 import psutil
 import os
 from PIL import Image
@@ -10,9 +11,11 @@ import sys
 import getopt
 import re
 
-base_url = "https://netrunnerdb.com/api/2.0/public/decklist/"
-runner_back = "../nsg-runner.tiff"
-corp_back = "../nsg-corp.tiff"
+base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
+runner_back  = "../../nsg-runner.tiff"
+corp_back    = "../../nsg-corp.tiff"
+rgb_profile  = "../../ECI-RGB.V1.0.icc"
+cmyk_profile = "../../ISOcoated_v2_eci.icc"
 
 resize_height = 346
 resize_width = 243
@@ -35,7 +38,7 @@ def main(argv):
             elif opt in ("-c"):
                 back_path = corp_back
             elif opt in ("-b", "--back"):
-                back = arg
+                back_path = arg
             else:
                 print ("Unsupported argument found!")
 
@@ -62,21 +65,37 @@ def main(argv):
                             print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
                             sanitized_title = sanitize_filename(card_data['stripped_title'])
                             tmp_name = "./foo.tiff"
-                            # get_card_front(card_id, session, tmp_name)
+                            time.sleep(3)
 
                             if card_data['type_code'] == "identity":
+                                # Identity card -- put at the front
                                 output_name = f"00_back.tiff"
-                                print(f"  {output_name}")
-                                output_name = f"00_{sanitized_title}.tiff"
-                                print(f"  {output_name}")
+                                if os.path.exists(output_name):
+                                    print("  <already downloaded>")
+                                else:
+                                    get_card_front(card_id, session, tmp_name)
+                                    shutil.copy(back_path, output_name)
+                                    print(f"  {output_name}")
+
+                                    output_name = f"00_{sanitized_title}.tiff"
+                                    shutil.copy(tmp_name, output_name)
+                                    print(f"  {output_name}")
 
                             else:
-                                for i in range(number):
-                                    output_name = f"{card_nr:02d}_{i}_back.tiff"
-                                    print(f"  {output_name}")
-                                    output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
-                                    print(f"  {output_name}")
-                                    card_nr += 1
+                                output_name = f"{card_nr:02d}_{0}_back.tiff"
+                                if os.path.exists(output_name):
+                                    print("  <already downloaded>")
+                                else:
+                                    get_card_front(card_id, session, tmp_name)
+                                    for i in range(number):
+                                        output_name = f"{card_nr:02d}_{i}_back.tiff"
+                                        shutil.copy(back_path, output_name)
+                                        print(f"  {output_name}")
+
+                                        output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
+                                        shutil.copy(tmp_name, output_name)
+                                        print(f"  {output_name}")
+                                        card_nr += 1
 
                     time.sleep(3)
 
@@ -118,8 +137,8 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-bordercolor", "black",
         "-border", "38x38",
         "-density", "300",
-        "-profile", "../ECI-RGB.V1.0.icc",
-        "-profile", "../ISOcoated_v2_eci.icc",
+        "-profile", rgb_profile,
+        "-profile", cmyk_profile,
         "-colorspace", "CMYK",
         output_path
     ], check=True)
