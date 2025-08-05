@@ -1,0 +1,110 @@
+import requests
+import psutil
+import os
+from PIL import Image
+from io import BytesIO
+import subprocess
+import time
+import math
+import sys
+import getopt
+
+base_url = "https://netrunnerdb.com/api/2.0/public/decklist/"
+resize_height = 346
+resize_width = 243
+usage = 'ANRProxyGenerator.py -d <deck id>'
+
+
+def main(argv):
+    deck_id = -1
+    try:
+        opts, args = getopt.getopt(argv, 'd:', ["deckid="]) #Get the deck id from the command line
+
+        for opt, arg in opts:
+            if opt in ("-d", "--deckid"):
+                deck_id = arg
+            else:
+                print ("Unsupported argument found!")
+
+        with requests.Session() as session:
+
+            print_memory_usage()
+            decklist_url = base_url + str(deck_id)
+            print(decklist_url)
+            deck_response = session.get(decklist_url)
+            print_memory_usage()
+
+            if deck_response.status_code == 200:
+                deck_data = deck_response.json()
+                proxy_list = []
+                for card_id, number in deck_data['data'][0]['cards'].items():
+                    #card_picture = session.get("http://netrunnerdb.com/card_image/" + card_id + ".png")
+                    with session.get(f"http://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
+                        print_memory_usage()
+                        if card_response.status_code == 200:
+                            card_json = card_response.json()
+                            card_data = card_json['data'][0]
+                            print(card_data)
+                            print(f"{number} x {card_data['title']} ({card_data['type_code']})")
+
+                            # get_card_front(card_id, session)
+                    time.sleep(3)
+
+
+                return
+            else:
+                print("Error: Could not retrieve decklist")
+
+    except getopt.GetoptError as e:
+        print("Error: " + str(e))
+        print(usage)
+        sys.exit(2)
+
+def get_card_front(card_id, session):
+    print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+    image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+    if image_response.status_code == 200:
+        dpi     = (300, 300)
+        size_in = (2.5, 3.5)
+        size_px = (int(size_in[0]*dpi[0]), int(size_in[1]*dpi[1]))
+
+        with open("./foo.jpg", "wb") as f:
+            f.write(image_response.content)
+        # image = Image.open(BytesIO(image_response.content))
+        # image_resized = image.resize(size_px, Image.LANCZOS)
+        # image_cmyk = image_resized.convert("CMYK")
+        # image_cmyk.save("./foo.tiff", format="TIFF", dpi=dpi)
+
+        convert_to_cmyk_icc("./foo.jpg", "./foo.tiff")
+        return True
+    return False
+
+def convert_to_cmyk_icc(input_path, output_path):
+    subprocess.run([
+        "magick",
+        input_path,
+        "-resize", "750x1050",
+        "-filter", "Mitchell", # Lanczo, Robidoux, Mitchell, Catrom
+        "-bordercolor", "black",
+        "-border", "38x38",
+        "-density", "300",
+        "-profile", "../ECI-RGB.V1.0.icc", # from https://www.eci.org/doku.php?id=en:downloads
+        "-profile", "../ISOcoated_v2_eci.icc",
+        "-colorspace", "CMYK",
+        output_path
+    ], check=True)
+
+    return
+
+def print_memory_usage(note=""):
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 ** 2
+    print(f"[MEM] {note} {mem_mb:.2f} MB")
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        print(usage)
+    else:
+        main(sys.argv[1:])
+
+
