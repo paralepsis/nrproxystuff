@@ -12,10 +12,11 @@ import getopt
 import re
 
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
-runner_back  = "../../nsg-runner.tiff"
-corp_back    = "../../nsg-corp.tiff"
-rgb_profile  = "../../ECI-RGB.V1.0.icc"
-cmyk_profile = "../../ISOcoated_v2_eci.icc"
+runner_back  = "../nsg-runner.tiff"
+corp_back    = "../nsg-corp.tiff"
+rgb_profile  = "../ECI-RGB.V1.0.icc"
+cmyk_profile = "../ISOcoated_v2_eci.icc"
+cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 
 resize_height = 346
 resize_width = 243
@@ -61,41 +62,36 @@ def main(argv):
                         if card_response.status_code == 200:
                             card_json = card_response.json()
                             card_data = card_json['data'][0]
+                            cache_name  = f"{cache_path}/{card_id}.tiff"
                             # print(card_data)
                             print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
                             sanitized_title = sanitize_filename(card_data['stripped_title'])
-                            tmp_name = "./foo.tiff"
                             time.sleep(3)
 
                             if card_data['type_code'] == "identity":
                                 # Identity card -- put at the front
                                 output_name = f"00_back.tiff"
-                                if os.path.exists(output_name):
-                                    print("  <already downloaded>")
-                                else:
-                                    get_card_front(card_id, session, tmp_name)
-                                    shutil.copy(back_path, output_name)
-                                    print(f"  {output_name}")
+                                get_card_front(card_id, session, cache_path)
+                                shutil.copy(back_path, output_name)
+                                print(f"  {output_name}")
 
-                                    output_name = f"00_{sanitized_title}.tiff"
-                                    shutil.copy(tmp_name, output_name)
-                                    print(f"  {output_name}")
+                                output_name = f"00_{sanitized_title}.tiff"
+                                shutil.copy(cache_name, output_name)
+                                print(f"  {output_name}")
 
                             else:
                                 output_name = f"{card_nr:02d}_{0}_back.tiff"
-                                if os.path.exists(output_name):
-                                    print("  <already downloaded>")
-                                else:
-                                    get_card_front(card_id, session, tmp_name)
-                                    for i in range(number):
-                                        output_name = f"{card_nr:02d}_{i}_back.tiff"
-                                        shutil.copy(back_path, output_name)
-                                        print(f"  {output_name}")
+                                get_card_front(card_id, session, cache_path)
 
-                                        output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
-                                        shutil.copy(tmp_name, output_name)
-                                        print(f"  {output_name}")
-                                        card_nr += 1
+                                for i in range(number):
+                                    output_name = f"{card_nr:02d}_{i}_back.tiff"
+                                    shutil.copy(back_path, output_name)
+                                    print(f"  {output_name}")
+
+                                    output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
+                                    shutil.copy(cache_name, output_name)
+                                    print(f"  {output_name}")
+                                    card_nr += 1
 
                     time.sleep(3)
 
@@ -109,24 +105,27 @@ def main(argv):
         print(usage)
         sys.exit(2)
 
-def get_card_front(card_id, session, output_path):
-    print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
-    image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
-    if image_response.status_code == 200:
-        dpi     = (300, 300)
-        size_in = (2.5, 3.5)
-        size_px = (int(size_in[0]*dpi[0]), int(size_in[1]*dpi[1]))
+def get_card_front(card_id, session, cache_path):
+    nrdb_file      = f"{cache_path}/{card_id}.jpg"
+    converted_file = f"{cache_path}/{card_id}.tiff"
 
-        with open("./foo.jpg", "wb") as f:
-            f.write(image_response.content)
-        # image = Image.open(BytesIO(image_response.content))
-        # image_resized = image.resize(size_px, Image.LANCZOS)
-        # image_cmyk = image_resized.convert("CMYK")
-        # image_cmyk.save("./foo.tiff", format="TIFF", dpi=dpi)
+    # print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+    if not os.path.exists(nrdb_file):
+        print(f"  Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+        image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+        if image_response.status_code == 200:
+            dpi     = (300, 300)
+            size_in = (2.5, 3.5)
+            size_px = (int(size_in[0]*dpi[0]), int(size_in[1]*dpi[1]))
+       
+            with open(nrdb_file, "wb") as f:
+                f.write(image_response.content)
 
-        convert_to_cmyk_icc("./foo.jpg", output_path)
-        return True
-    return False
+    if not os.path.exists(converted_file):
+        print(f"  Converting {nrdb_file} to CMYK TIFF with border.")
+        convert_to_cmyk_icc(nrdb_file, converted_file)
+
+    return True
 
 def convert_to_cmyk_icc(input_path, output_path):
     subprocess.run([
