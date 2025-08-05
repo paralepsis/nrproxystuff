@@ -4,6 +4,7 @@ import psutil
 import os
 from PIL import Image
 from io import BytesIO
+from pathlib import Path
 import subprocess
 import time
 import math
@@ -66,11 +67,11 @@ def main(argv):
                             # print(card_data)
                             print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
                             sanitized_title = sanitize_filename(card_data['stripped_title'])
-                            time.sleep(3)
 
                             if card_data['type_code'] == "identity":
                                 # Identity card -- put at the front
                                 output_name = f"00_back.tiff"
+                                time.sleep(3)
                                 get_card_front(card_id, session, cache_path)
                                 shutil.copy(back_path, output_name)
                                 print(f"  {output_name}")
@@ -81,6 +82,7 @@ def main(argv):
 
                             else:
                                 output_name = f"{card_nr:02d}_{0}_back.tiff"
+                                time.sleep(3)
                                 get_card_front(card_id, session, cache_path)
 
                                 for i in range(number):
@@ -95,6 +97,8 @@ def main(argv):
 
                     time.sleep(3)
 
+                print("  Cards downloaded and converted.")
+                tiffs_to_cmyk_pdf(".", "./deck.pdf")
 
                 return
             else:
@@ -105,13 +109,36 @@ def main(argv):
         print(usage)
         sys.exit(2)
 
+def tiffs_to_cmyk_pdf(input_dir, output_pdf):
+    input_path = Path(input_dir)
+    tiff_files = sorted(input_path.glob("*.tiff"))
+
+    if not tiff_files:
+        print("No TIFF files found.")
+        return
+
+    # Create command to pass to ImageMagick
+    command = [
+        "magick convert",                         # or "magick convert" on ImageMagick v7
+        *[str(f) for f in tiff_files],     # list of .tiff file paths
+        "-colorspace", "CMYK",             # preserve CMYK
+        "-compress", "zip",                # good quality
+        "-density", "300",                 # DPI for print
+        f"PDF:{output_pdf}"
+    ]
+
+    print("  Running:", " ".join(command))
+    subprocess.run(command, check=True)
+    print(f"Saved to {output_pdf}")
+
+
 def get_card_front(card_id, session, cache_path):
     nrdb_file      = f"{cache_path}/{card_id}.jpg"
     converted_file = f"{cache_path}/{card_id}.tiff"
 
     # print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
     if not os.path.exists(nrdb_file):
-        print(f"  Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+        print(f"  Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
         image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
         if image_response.status_code == 200:
             dpi     = (300, 300)
