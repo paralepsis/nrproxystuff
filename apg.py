@@ -88,7 +88,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-bordercolor", "black",
         "-border", "38x38",
         "-density", "300",
-        "-profile", "../ECI-RGB.V1.0.icc", # from https://www.eci.org/doku.php?id=en:downloads
+        "-profile", "../ECI-RGB.V1.0.icc",
         "-profile", "../ISOcoated_v2_eci.icc",
         "-colorspace", "CMYK",
         output_path
