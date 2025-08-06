@@ -1,6 +1,7 @@
 import requests
 import shutil
 import psutil
+import qrcode
 import os
 from PIL import Image
 from io import BytesIO
@@ -70,35 +71,39 @@ def main(argv):
 
                             if card_data['type_code'] == "identity":
                                 # Identity card -- put at the front
-                                output_name = f"00_back.tiff"
-                                time.sleep(3)
+                                output_name = f"00_0_back.tiff"
                                 get_card_front(card_id, session, cache_path)
                                 shutil.copy(back_path, output_name)
                                 print(f"  {output_name}")
 
-                                output_name = f"00_{sanitized_title}.tiff"
+                                output_name = f"00_1_{sanitized_title}.tiff"
                                 shutil.copy(cache_name, output_name)
                                 print(f"  {output_name}")
 
                             else:
-                                output_name = f"{card_nr:02d}_{0}_back.tiff"
-                                time.sleep(3)
                                 get_card_front(card_id, session, cache_path)
 
                                 for i in range(number):
-                                    output_name = f"{card_nr:02d}_{i}_back.tiff"
+                                    output_name = f"{card_nr:02d}_0_back.tiff"
                                     shutil.copy(back_path, output_name)
                                     print(f"  {output_name}")
 
-                                    output_name = f"{card_nr:02d}_{i}_{sanitized_title}.tiff"
+                                    output_name = f"{card_nr:02d}_1_{sanitized_title}.tiff"
                                     shutil.copy(cache_name, output_name)
                                     print(f"  {output_name}")
                                     card_nr += 1
 
-                    time.sleep(3)
-
                 print("  Cards downloaded and converted.")
+
+                print("  Adding QR code card.")
+                output_name = f"{card_nr:02d}_0_back.tiff"
+                shutil.copy(back_path, output_name)
+                output_name = f"{card_nr:02d}_1_qrcode.tiff"
+                create_qr_card_cmyk(decklist_url, output_name)
+
                 tiffs_to_cmyk_pdf(".", "./deck.pdf")
+
+
 
                 return
             else:
@@ -119,7 +124,7 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
 
     # Create command to pass to ImageMagick
     command = [
-        "magick convert",                         # or "magick convert" on ImageMagick v7
+        "magick",
         *[str(f) for f in tiff_files],     # list of .tiff file paths
         "-colorspace", "CMYK",             # preserve CMYK
         "-compress", "zip",                # good quality
@@ -147,6 +152,7 @@ def get_card_front(card_id, session, cache_path):
        
             with open(nrdb_file, "wb") as f:
                 f.write(image_response.content)
+            time.sleep(3)
 
     if not os.path.exists(converted_file):
         print(f"  Converting {nrdb_file} to CMYK TIFF with border.")
@@ -161,6 +167,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-resize", "750x1050",
         "-filter", "Mitchell", # Lanczo, Robidoux, Mitchell, Catrom
         "-bordercolor", "black",
+        "-units", "PixelsPerInch",
         "-border", "38x38",
         "-density", "300",
         "-profile", rgb_profile,
@@ -179,6 +186,56 @@ def print_memory_usage(note=""):
     process = psutil.Process(os.getpid())
     mem_mb = process.memory_info().rss / 1024 ** 2
     print(f"[MEM] {note} {mem_mb:.2f} MB")
+
+import qrcode
+from PIL import Image
+
+def create_qr_card_cmyk(data, output_path, dpi=300):
+    # === 1. Generate QR code ===
+    qr = qrcode.QRCode(
+        version=2,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white").convert("L")
+
+    # === 2. Convert QR to RGBA and recolor to rich black ===
+    qr_rgba = qr_img.convert("RGBA")
+    pixels = qr_rgba.load()
+
+    # Map black pixels to rich CMYK black approximation
+    for y in range(qr_rgba.height):
+        for x in range(qr_rgba.width):
+            r, g, b, a = pixels[x, y]
+            if (r, g, b) == (0, 0, 0):
+                # Rich black RGB approximation (you can tweak this)
+                pixels[x, y] = (30, 20, 20, 255)
+            elif (r, g, b) == (255, 255, 255):
+                pixels[x, y] = (255, 255, 255, 255)
+
+    # Convert back to CMYK
+    qr_cmyk = qr_rgba.convert("CMYK")
+
+    # Resize QR to 2.0" × 2.0"
+    qr_cmyk = qr_cmyk.resize((600, 600), Image.LANCZOS)
+
+    # === 3. Create CMYK canvas ===
+    canvas_size = (825, 1125)  # 2.75" × 3.75" @ 300dpi
+    canvas = Image.new("CMYK", canvas_size, (0, 0, 0, 0))  # White CMYK background
+
+    # === 4. Paste in center ===
+    pos = ((canvas_size[0] - qr_cmyk.width) // 2, (canvas_size[1] - qr_cmyk.height) // 2)
+    canvas.paste(qr_cmyk, pos)
+
+    # === 5. Save ===
+    canvas.save(output_path, dpi=(dpi, dpi), format="TIFF")
+    print(f"Saved to {output_path}")
+
+# Example usage
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
