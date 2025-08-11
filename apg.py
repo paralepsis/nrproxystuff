@@ -3,7 +3,7 @@ import shutil
 import psutil
 import qrcode
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 from io import BytesIO
 from pathlib import Path
 import subprocess
@@ -16,6 +16,7 @@ import re
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "../nsg-runner.tiff"
 corp_back    = "../nsg-corp.tiff"
+back_path    = "../nsg-runner.tiff"
 rgb_profile  = "../ECI-RGB.V1.0.icc"
 cmyk_profile = "../ISOcoated_v2_eci.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
@@ -24,24 +25,23 @@ resize_height = 346
 resize_width = 243
 usage = 'ANRProxyGenerator.py -d <deck id>'
 
-back_path = ""
-
 def main(argv):
     deck_id = -1
+    add_qr  = False
     try:
-        opts, args = getopt.getopt(argv, 'd:b:rc', ["deckid=","back="]) #Get the deck id from the command line
-
-        back = "../nsg-runner.tiff"
+        opts, args = getopt.getopt(argv, 'd:b:rcq', ["qrcode","deckid=","back="]) #Get the deck id from the command line
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
                 deck_id = arg
-            elif opt in ("-r"):
+            elif opt == "-r":
                 back_path = runner_back
-            elif opt in ("-c"):
+            elif opt == "-c":
                 back_path = corp_back
             elif opt in ("-b", "--back"):
                 back_path = arg
+            elif opt in ("-q", "--qrcode"):
+                add_qr = True
             else:
                 print ("Unsupported argument found!")
 
@@ -60,7 +60,7 @@ def main(argv):
                 for card_id, number in deck_data['data'][0]['cards'].items():
                     # note: human-centric page is https://netrunnerdb.com/en/card/{card_id}
                     #
-                    with session.get(f"http://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
+                    with session.get(f"https://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
                         # print_memory_usage()
                         if card_response.status_code == 200:
                             card_json = card_response.json()
@@ -92,6 +92,9 @@ def main(argv):
                                     output_name = f"{card_nr:02d}_1_{sanitized_title}.tiff"
                                     shutil.copy(cache_name, output_name)
                                     print(f"  {output_name}")
+                                    # inefficient, but effective way to add QR code
+                                    if add_qr == True:
+                                        add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
                                     card_nr += 1
 
                 print("  Cards downloaded and converted.")
@@ -127,8 +130,8 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
     command = [
         "magick",
         *[str(f) for f in tiff_files],     # list of .tiff file paths
-        "-colorspace", "CMYK",             # preserve CMYK
-        "-compress", "zip",                # good quality
+        # "-colorspace", "CMYK",             # preserve CMYK
+        "-compress", "Zip",                # good quality
         "-density", "300",                 # DPI for print
         f"PDF:{output_pdf}"
     ]
@@ -142,7 +145,6 @@ def get_card_front(card_id, session, cache_path):
     nrdb_file      = f"{cache_path}/{card_id}.jpg"
     converted_file = f"{cache_path}/{card_id}.tiff"
 
-    # print(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
     if not os.path.exists(nrdb_file):
         print(f"  Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
         image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
@@ -173,7 +175,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-density", "300",
         "-profile", rgb_profile,
         "-profile", cmyk_profile,
-        "-colorspace", "CMYK",
+        "-compress", "Zip",
         output_path
     ], check=True)
 
@@ -188,8 +190,73 @@ def print_memory_usage(note=""):
     mem_mb = process.memory_info().rss / 1024 ** 2
     print(f"[MEM] {note} {mem_mb:.2f} MB")
 
-import qrcode
-from PIL import Image
+def add_qr_to_cmyk_tiff(
+    tiff_path,
+    data,
+    qr_size_in=0.6,      # physical size of the QR on the card (inches)
+    margin_in=0.125,      # distance from edges (inches)
+    dpi_default=300,
+    pure_k=True           # True = K-only; False = rich black CMYK tuple
+):
+    tiff_path = Path(tiff_path)
+    im = Image.open(tiff_path)
+
+    # Ensure CMYK base
+    if im.mode != "CMYK":
+        im = im.convert("CMYK")
+
+    # Pull DPI & ICC profile if present
+    dpi = im.info.get("dpi", (dpi_default, dpi_default))
+    icc = im.info.get("icc_profile", None)
+
+    # Build 1-bit QR mask (crisp edges)
+    qr = qrcode.QRCode(
+        version=None,  # auto fit
+        error_correction=qrcode.constants.ERROR_CORRECT_M, # H is more robust
+        box_size=10,
+        border=3 # spec says 4
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    qr_mask = qr.make_image(fill_color="black", back_color="white").convert("1")
+
+    # Size in pixels
+    qr_px = (int(qr_size_in * dpi[0]), int(qr_size_in * dpi[1]))
+    qr_mask = qr_mask.resize(qr_px, Image.NEAREST)  # keep edges crisp
+
+    # Make the ink tile (pure K or rich black)
+    if pure_k:
+        # C=M=Y=0, K=100%
+        tile_color = (0, 0, 0, 255)
+    else:
+        # e.g., rich black C60 M40 Y40 K100
+        tile_color = (153, 102, 102, 255)  # 0..255 scaling of 60/40/40/100%
+
+    qr_tile = Image.new("CMYK", qr_px, tile_color)
+
+    # Compute NE (upper-right) position with margin
+    margin_px = (int(margin_in * dpi[0]), int(margin_in * dpi[1]))
+    x = im.width - qr_px[0] - margin_px[0]
+    y = margin_px[1]
+
+    # 5) Lay down a solid WHITE background first (covers quiet zone & modules)
+    white_cmyk = (0,0,0,0)
+    white_tile = Image.new("CMYK", qr_px, white_cmyk)
+    im.paste(white_tile, (x, y))  # no mask → fully opaque white patch
+
+    # Paste via mask (ink where mask is black → invert to use as alpha)
+    mask = ImageOps.invert(qr_mask.convert("L"))  # white=opaque for paste
+    im.paste(qr_tile, (x, y), mask)
+
+    # Save back, preserving DPI and ICC, with TIFF compression
+    im.save(
+        # tiff_path.with_suffix(".qr.tiff"),
+        tiff_path,
+        format="TIFF",
+        dpi=dpi,
+        compression="tiff_adobe_deflate",
+        icc_profile=icc
+    )
 
 def create_qr_card_cmyk(data, output_path, dpi=300):
     # === 1. Generate QR code ===
@@ -201,39 +268,33 @@ def create_qr_card_cmyk(data, output_path, dpi=300):
     )
     qr.add_data(data)
     qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("L")
+    qr_mask = qr.make_image(fill_color="black", back_color="white").convert("1") # 1-bit mask
 
-    # === 2. Convert QR to RGBA and recolor to rich black ===
-    qr_rgba = qr_img.convert("RGBA")
-    pixels = qr_rgba.load()
+    # 2) Sizes
+    card_px = (int(2.75 * dpi), int(3.75 * dpi))  # 825x1125 at 300 DPI
+    qr_target = int(2.0 * dpi)                    # 2.0" square → 600px
+    qr_mask = qr_mask.resize((qr_target, qr_target), Image.NEAREST)  # preserve crisp edges
 
-    # Map black pixels to rich CMYK black approximation
-    for y in range(qr_rgba.height):
-        for x in range(qr_rgba.width):
-            r, g, b, a = pixels[x, y]
-            if (r, g, b) == (0, 0, 0):
-                # Rich black RGB approximation (you can tweak this)
-                pixels[x, y] = (30, 20, 20, 255)
-            elif (r, g, b) == (255, 255, 255):
-                pixels[x, y] = (255, 255, 255, 255)
+    # 3) CMYK canvas (paper white)
+    card = Image.new("CMYK", card_px, (0, 0, 0, 0))  # CMYK white
 
-    # Convert back to CMYK
-    qr_cmyk = qr_rgba.convert("CMYK")
+    # 4) Rich black swatch in CMYK: C=60%, M=40%, Y=40%, K=100% → scale 0..255
+    rich_black = (int(0.60*255), int(0.40*255), int(0.40*255), 255)
 
-    # Resize QR to 2.0" × 2.0"
-    qr_cmyk = qr_cmyk.resize((600, 600), Image.LANCZOS)
+    # Create a solid CMYK tile the size of the QR
+    qr_tile = Image.new("CMYK", (qr_target, qr_target), rich_black)
 
-    # === 3. Create CMYK canvas ===
-    canvas_size = (825, 1125)  # 2.75" × 3.75" @ 300dpi
-    canvas = Image.new("CMYK", canvas_size, (0, 0, 0, 0))  # White CMYK background
+    # 5) Paste using the 1-bit mask (ink where mask is black)
+    x = (card_px[0] - qr_target) // 2
+    y = (card_px[1] - qr_target) // 2
+    # Invert mask because paste uses non-zero mask as “use source”
+    qr_mask_inv = ImageOps.invert(qr_mask.convert("L"))
+    card.paste(qr_tile, (x, y), qr_mask_inv)
 
-    # === 4. Paste in center ===
-    pos = ((canvas_size[0] - qr_cmyk.width) // 2, (canvas_size[1] - qr_cmyk.height) // 2)
-    canvas.paste(qr_cmyk, pos)
+    # 6) Save CMYK TIFF with proper units/DPI and compression
+    card.save(output_path, format="TIFF", dpi=(dpi, dpi), compression="tiff_adobe_deflate")
+    print(f"Saved QR card to {output_path}")
 
-    # === 5. Save ===
-    canvas.save(output_path, dpi=(dpi, dpi), format="TIFF")
-    print(f"Saved to {output_path}")
 
 # Example usage
 
