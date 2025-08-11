@@ -58,7 +58,8 @@ def main(argv):
                 card_nr = 1 # count for printing purposes, 0 reserved for identity
 
                 for card_id, number in deck_data['data'][0]['cards'].items():
-                    #card_picture = session.get("http://netrunnerdb.com/card_image/" + card_id + ".png")
+                    # note: human-centric page is https://netrunnerdb.com/en/card/{card_id}
+                    #
                     with session.get(f"http://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
                         # print_memory_usage()
                         if card_response.status_code == 200:
