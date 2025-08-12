@@ -65,19 +65,30 @@ def main(argv):
                         if card_response.status_code == 200:
                             card_json = card_response.json()
                             card_data = card_json['data'][0]
-                            cache_name  = f"{cache_path}/{card_id}.tiff"
                             # print(card_data)
                             print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
                             sanitized_title = sanitize_filename(card_data['stripped_title'])
 
                             if card_data['type_code'] == "identity":
-                                # Identity card -- put at the front
-                                output_name = f"00_0_back.tiff"
-                                get_card_front(card_id, session, cache_path)
-                                shutil.copy(back_path, output_name)
-                                print(f"  {output_name}")
+                                # Back of identity card: flipped card or duplicate of front
+                                if "Flip side:" in card_data['stripped_text']:
+                                    output_name = f"00_0_{sanitized_title}-flip.tiff"
+                                    flip_id = f"{card_id}-0"
+                                    cache_name  = f"{cache_path}/{flip_id}.tiff"
+                                    get_card_front(flip_id, session, cache_path)
+                                    shutil.copy(cache_name, output_name)
+                                    print(f"  {output_name} (flipped)")
+                                else:
+                                    cache_name  = f"{cache_path}/{card_id}.tiff"
+                                    output_name = f"00_0_{sanitized_title}.tiff"
+                                    get_card_front(card_id, session, cache_path)
+                                    shutil.copy(cache_name, output_name)
+                                    print(f"  {output_name} (dup)")
 
+                                # Normal front of identity card
+                                cache_name  = f"{cache_path}/{card_id}.tiff"
                                 output_name = f"00_1_{sanitized_title}.tiff"
+                                get_card_front(card_id, session, cache_path)
                                 shutil.copy(cache_name, output_name)
                                 print(f"  {output_name}")
 
@@ -89,6 +100,7 @@ def main(argv):
                                     shutil.copy(back_path, output_name)
                                     print(f"  {output_name}")
 
+                                    cache_name  = f"{cache_path}/{card_id}.tiff"
                                     output_name = f"{card_nr:02d}_1_{sanitized_title}.tiff"
                                     shutil.copy(cache_name, output_name)
                                     print(f"  {output_name}")
