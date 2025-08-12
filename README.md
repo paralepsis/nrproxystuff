@@ -1,5 +1,7 @@
 # nrproxystuff
-Me hacking on a Netrunner proxy card project.
+Me hacking on a Netrunner proxy card project. Takes a deck ID from
+netrunnerDB and spits out a PDF ready for submission to DriveThruCards.com.
+Or, I think it does ... waiting on my first order.
 
 Started from Ecophagy's ANRProxyGenerator:
   https://github.com/Ecophagy/ANRProxyGenerator
