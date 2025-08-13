@@ -20,8 +20,6 @@ rgb_profile  = "../ECI-RGB.V1.0.icc"
 cmyk_profile = "../ISOcoated_v2_eci.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 
-resize_height = 346
-resize_width = 243
 usage = 'ANRProxyGenerator.py -d <deck id>'
 
 def main(argv):
