@@ -14,6 +14,7 @@ That code is also MIT licensed. There isn't a lot of it left, here.
 This is what I did:
 ```
 conda create python=3.10 requests pillow psutil
+conda install conda-forge::ghostscript
 pip install qrcode[pil]
 ```
 

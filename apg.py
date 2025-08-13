@@ -16,7 +16,6 @@ import re
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "../nsg-runner.tiff"
 corp_back    = "../nsg-corp.tiff"
-back_path    = "../nsg-runner.tiff"
 rgb_profile  = "../ECI-RGB.V1.0.icc"
 cmyk_profile = "../ISOcoated_v2_eci.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
@@ -28,6 +27,8 @@ usage = 'ANRProxyGenerator.py -d <deck id>'
 def main(argv):
     deck_id = -1
     add_qr  = False
+    back_path    = ""
+
     try:
         opts, args = getopt.getopt(argv, 'd:b:rcq', ["qrcode","deckid=","back="]) #Get the deck id from the command line
 
@@ -57,6 +58,8 @@ def main(argv):
                 deck_data = deck_response.json()
                 card_nr = 1 # count for printing purposes, 0 reserved for identity
 
+                print(f"Selected {deck_data['data'][0]['name']}.")
+
                 for card_id, number in deck_data['data'][0]['cards'].items():
                     # note: human-centric page is https://netrunnerdb.com/en/card/{card_id}
                     #
@@ -66,7 +69,15 @@ def main(argv):
                             card_json = card_response.json()
                             card_data = card_json['data'][0]
                             # print(card_data)
-                            print(f"{number} x {card_data['stripped_title']} ({card_data['type_code']})")
+                            if back_path == "":
+                                if card_data['side_code'] == "corp":
+                                    print("Autodetected corp deck.")
+                                    back_path = corp_back
+                                else:
+                                    print("Autodetected runner deck.")
+                                    back_path = runner_back
+
+                            print(f"  {number} x {card_data['stripped_title']} ({card_data['type_code']})")
                             sanitized_title = sanitize_filename(card_data['stripped_title'])
 
                             if card_data['type_code'] == "identity":
@@ -77,47 +88,55 @@ def main(argv):
                                     cache_name  = f"{cache_path}/{flip_id}.tiff"
                                     get_card_front(flip_id, session, cache_path)
                                     shutil.copy(cache_name, output_name)
-                                    print(f"  {output_name} (flipped)")
+                                    # print(f"  {output_name} (flipped)")
                                 else:
                                     cache_name  = f"{cache_path}/{card_id}.tiff"
                                     output_name = f"00_0_{sanitized_title}.tiff"
                                     get_card_front(card_id, session, cache_path)
                                     shutil.copy(cache_name, output_name)
-                                    print(f"  {output_name} (dup)")
+                                    # print(f"  {output_name} (dup)")
 
                                 # Normal front of identity card
                                 cache_name  = f"{cache_path}/{card_id}.tiff"
                                 output_name = f"00_1_{sanitized_title}.tiff"
                                 get_card_front(card_id, session, cache_path)
                                 shutil.copy(cache_name, output_name)
-                                print(f"  {output_name}")
+                                # print(f"  {output_name}")
 
                             else:
                                 get_card_front(card_id, session, cache_path)
 
                                 for i in range(number):
-                                    output_name = f"{card_nr:02d}_0_back.tiff"
-                                    shutil.copy(back_path, output_name)
-                                    print(f"  {output_name}")
+                                    # output_name = f"{card_nr:02d}_0_back.tiff"
+                                    # shutil.copy(back_path, output_name)
+                                    # print(f"  {output_name}")
 
                                     cache_name  = f"{cache_path}/{card_id}.tiff"
                                     output_name = f"{card_nr:02d}_1_{sanitized_title}.tiff"
                                     shutil.copy(cache_name, output_name)
-                                    print(f"  {output_name}")
+                                    # print(f"  {output_name}")
                                     # inefficient, but effective way to add QR code
                                     if add_qr == True:
                                         add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
                                     card_nr += 1
 
-                print("  Cards downloaded and converted.")
+                print("All cards downloaded and converted.")
 
-                print("  Adding QR code card.")
+                print("Adding QR code card.")
                 output_name = f"{card_nr:02d}_0_back.tiff"
                 shutil.copy(back_path, output_name)
                 output_name = f"{card_nr:02d}_1_qrcode.tiff"
                 create_qr_card_cmyk(decklist_url, output_name)
 
-                tiffs_to_cmyk_pdf(".", "./deck.pdf")
+                print("Adding backs.")
+                for i in range(1,card_nr+1):
+                    output_name = f"{i:02d}_0_back.tiff"
+                    shutil.copy(back_path, output_name)
+                    # print(f"  {output_name}")
+
+
+                tiffs_to_cmyk_pdf(".", "./deck-pre.pdf")
+                dedup_pdf("./deck-pre.pdf", "./deck.pdf");
 
 
 
@@ -148,7 +167,7 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
         f"PDF:{output_pdf}"
     ]
 
-    print("  Running:", " ".join(command))
+    print("Running:", " ".join(command))
     subprocess.run(command, check=True)
     print(f"Saved to {output_pdf}")
 
@@ -158,7 +177,7 @@ def get_card_front(card_id, session, cache_path):
     converted_file = f"{cache_path}/{card_id}.tiff"
 
     if not os.path.exists(nrdb_file):
-        print(f"  Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
+        print(f"    Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
         image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
         if image_response.status_code == 200:
             dpi     = (300, 300)
@@ -170,7 +189,7 @@ def get_card_front(card_id, session, cache_path):
             time.sleep(3)
 
     if not os.path.exists(converted_file):
-        print(f"  Converting {nrdb_file} to CMYK TIFF with border.")
+        print(f"    Converting {nrdb_file} to CMYK TIFF with border.")
         convert_to_cmyk_icc(nrdb_file, converted_file)
 
     return True
@@ -305,7 +324,22 @@ def create_qr_card_cmyk(data, output_path, dpi=300):
 
     # 6) Save CMYK TIFF with proper units/DPI and compression
     card.save(output_path, format="TIFF", dpi=(dpi, dpi), compression="tiff_adobe_deflate")
-    print(f"Saved QR card to {output_path}")
+    # print(f"Saved QR card to {output_path}")
+
+def dedup_pdf(input_path, output_path):
+    cmd = [
+        "gs",
+        "-dBATCH",
+        "-dNOPAUSE",
+        "-sDEVICE=pdfwrite",
+        "-dPDFSETTINGS=/prepress",  # high quality for print
+        f"-sOutputFile={output_path}",
+        input_path
+    ]
+
+    subprocess.run(cmd, check=True)
+    print(f"Saved deduped PDF to {output_path}")
+
 
 
 # Example usage
