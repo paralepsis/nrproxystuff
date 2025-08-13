@@ -345,7 +345,7 @@ def dedup_pdf(input_path, output_path):
     ]
 
     subprocess.run(cmd, check=True)
-    print(f"Saved deduped PDF to {output_path}")
+    print(f"Saved deduped, hopefully PDF/X-1a:2003 compliant PDF to {output_path}.")
 
 
 
