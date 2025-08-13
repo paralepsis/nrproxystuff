@@ -115,6 +115,7 @@ def main(argv):
                                     # print(f"  {output_name}")
                                     # inefficient, but effective way to add QR code
                                     if add_qr == True:
+                                        print(f"  Adding QR code.")
                                         add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
                                     card_nr += 1
 
@@ -326,7 +327,7 @@ def create_qr_card_cmyk(data, output_path, dpi=300):
 
 def dedup_pdf(input_path, output_path):
     cmd = [
-        "gs",
+        "gs", "-q",
         "-dBATCH",
         "-dNOSAFER", # This is strictly here to let gs get to the CMYK profile listed below.
         "-dNOPAUSE",
