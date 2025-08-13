@@ -330,9 +330,16 @@ def dedup_pdf(input_path, output_path):
     cmd = [
         "gs",
         "-dBATCH",
+        "-dNOSAFER", # This is strictly here to let gs get to the CMYK profile listed below.
         "-dNOPAUSE",
         "-sDEVICE=pdfwrite",
+        "-sProcessColorModel=DeviceCMYK",
+        f"-sOutputICCProfile={cmyk_profile}",
+        "-dPDFX=true",
         "-dPDFSETTINGS=/prepress",  # high quality for print
+        "-dEmbedAllFonts=true",
+        "-dSubsetFonts=false",
+        "-dCompressFonts=true",
         f"-sOutputFile={output_path}",
         input_path
     ]
