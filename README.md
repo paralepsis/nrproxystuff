@@ -25,7 +25,12 @@ Found here:
 - From those you can grab ECI-RGB.V1.0.icc and ISOcoated_v2_eci.icc (respectively).
 
 ## Card Backs
-I found some online. Converted to correct format with something like this:
+There are some card backs provided. I generated them with ChatGPT5. The corp back uses an image found here:
+  https://www.clipartmax.com/middle/m2i8A0Z5m2N4A0A0_company-corporation-factory-icon-company-corporation-factory-icon/
+
+It's free for personal use.
+
+Converted to correct format with something like this:
 ```
 magick ./chatgpt-corp.png -resize 750x1050 -bordercolor black -border 38x38
 -units PixelsPerInch -density 300 -profile ../../ECI-RGB.V1.0.icc
