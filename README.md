@@ -4,6 +4,14 @@ netrunnerDB and spits out a PDF ready for submission to DriveThruCards.com.
 
 *Or, I think it does ... waiting on my first order.*
 
+Details:
+- Uses ImageMagick for conversion to TIFF format, addition of black border, and CMYK format.
+- Uses GhostScript to deduplicate the PDF, shrinking a good bit.
+- There's an option to include a QR code on every card, linking to the netrunnerdb page, but
+  it's not fully baked.
+- Correctly handles 1-sided and 2-sided identities, simply printing 1-sided versions on both
+  sides of the card.
+
 ## Shout out
 I started from Ecophagy's ANRProxyGenerator:
   https://github.com/Ecophagy/ANRProxyGenerator
