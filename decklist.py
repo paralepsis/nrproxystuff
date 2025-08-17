@@ -35,7 +35,7 @@ def _section_order_for_side(side):
 
 def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
                                       dpi=300, size_in=(2.75, 3.75),
-                                      two_columns=True, body_pt=8):
+                                      two_columns=True, body_pt=9):
     """
     card_meta: dict { card_id: { 'title': str, 'type_code': str, 'count': int } }
     """
@@ -49,7 +49,7 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
         "/System/Library/Fonts/Supplemental/Helvetica.ttc",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
-    header_font = _try_load_font(preferred_fonts, _pt(10, dpi))
+    header_font = _try_load_font(preferred_fonts, _pt(11, dpi))
     body_font   = _try_load_font(preferred_fonts, _pt(body_pt, dpi))
 
     M  = _pt(12, dpi)    # outer margin
@@ -57,9 +57,6 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
     y  = M
     k  = (0,0,0,255)
     k60= (0,0,0,int(255*0.6))
-
-    draw.line([(M, y), (W-M, y)], fill=k60, width=1)
-    y += _pt(6, dpi)
 
     items = []
     for key, val in card_meta.items():
@@ -96,24 +93,24 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
     col_x = [M, M + col_w + G][:col_count]
     usable_height = H - M - y
 
-    # Draw
-    col_heights = [0]*col_count
+    # Draw for real (sequential column fill: left column top-to-bottom, then right column)
     col_y = [y]*col_count
+    col_used = [0]*col_count
+    col_idx = 0
+
+    # Precompute block heights and wrapped lines in order
+    prepared = []
     for kind, text in sections:
         if kind == "__HEADER__":
             fh = header_font.getbbox("Ag")[3] - header_font.getbbox("Ag")[1]
-            block_h = fh + _pt(3, dpi)
-            i = min(range(col_count), key=lambda j: col_heights[j])
-            draw.text((col_x[i], col_y[i]), text, fill=k, font=header_font)
-            col_y[i] += fh + _pt(3, dpi)
-            col_heights[i] += block_h
+            prepared.append(("__HEADER__", text, fh, [text]))
         else:
             fh = body_font.getbbox("Ag")[3] - body_font.getbbox("Ag")[1]
-            # wrap
             wrap = []
             words = text.split()
             cur = ""
-            for w in words:
+            while words:
+                w = words.pop(0)
                 t = (cur + " " + w).strip()
                 if (body_font.getbbox(t)[2] - body_font.getbbox(t)[0]) <= (col_w - _pt(2, dpi)):
                     cur = t
@@ -121,16 +118,38 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
                     if cur: wrap.append(cur)
                     cur = w
             if cur: wrap.append(cur)
-            block_h = fh*len(wrap) + _pt(2, dpi)
-            i = min(range(col_count), key=lambda j: col_heights[j])
-            if col_heights[i] + block_h <= usable_height:
-                for line in wrap:
-                    draw.text((col_x[i], col_y[i]), line, fill=k, font=body_font)
-                    col_y[i] += fh
-                col_y[i] += _pt(2, dpi)
-                col_heights[i] += block_h
-            else:
-                break  # out of space
+            prepared.append(("__LINE__", text, fh, wrap))
+
+    for kind, text, fh, lines_wrapped in prepared:
+        # compute block height
+        if kind == "__HEADER__":
+            block_h = fh + _pt(3, dpi)
+        else:
+            block_h = fh*len(lines_wrapped) + _pt(2, dpi)
+
+        # If doesn't fit in current column, move to next column
+        if col_used[col_idx] + block_h > usable_height and col_idx + 1 < col_count:
+            col_idx += 1
+
+        # If still doesn't fit and no more columns, stop
+        if col_used[col_idx] + block_h > usable_height and col_idx == col_count - 1:
+            break
+
+        # Draw
+        x = col_x[col_idx]
+        yy = col_y[col_idx]
+        if kind == "__HEADER__":
+            draw.text((x, yy), text, fill=k, font=header_font)
+            yy += fh + _pt(3, dpi)
+        else:
+            for line in lines_wrapped:
+                draw.text((x, yy), line, fill=k, font=body_font)
+                yy += fh
+            yy += _pt(2, dpi)
+
+        # Update column usage
+        col_y[col_idx] = yy
+        col_used[col_idx] += block_h
 
     img.save(output_path, format="TIFF", dpi=(dpi, dpi), compression="tiff_adobe_deflate")
     print(f"Saved grouped decklist to {output_path}")

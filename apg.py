@@ -12,6 +12,7 @@ import math
 import sys
 import getopt
 import re
+from decklist import create_decklist_card_grouped_cmyk
 
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "backs/chatgpt-runner-back.tiff"
@@ -23,9 +24,11 @@ cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 usage = 'ANRProxyGenerator.py -d <deck id>'
 
 def main(argv):
-    deck_id = -1
-    add_qr  = False
-    back_path    = ""
+    deck_id   = -1
+    add_qr    = False
+    back_path = ""
+    side      = ""
+    card_meta = {}
 
     try:
         opts, args = getopt.getopt(argv, 'd:b:rcq', ["qrcode","deckid=","back="]) #Get the deck id from the command line
@@ -66,13 +69,21 @@ def main(argv):
                         if card_response.status_code == 200:
                             card_json = card_response.json()
                             card_data = card_json['data'][0]
+
+                            # for card list
+                            card_meta[card_id] = {'title': card_data['stripped_title'],
+                                                  'type_code': card_data['type_code'],
+                                                  'count': number}
+
                             # print(card_data)
                             if back_path == "":
                                 if card_data['side_code'] == "corp":
                                     print("Autodetected corp deck.")
+                                    side = "corp"
                                     back_path = corp_back
                                 else:
                                     print("Autodetected runner deck.")
+                                    side = "runner"
                                     back_path = runner_back
 
                             print(f"  {number} x {card_data['stripped_title']} ({card_data['type_code']})")
@@ -119,11 +130,14 @@ def main(argv):
                                         add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
                                     card_nr += 1
 
+
                 print("All cards downloaded and converted.")
 
-                print("Adding QR code card.")
+                print("Adding decklist card.")
+                create_decklist_card_grouped_cmyk(card_meta, side, "./list.tiff")
                 output_name = f"{card_nr:02d}_0_back.tiff"
-                shutil.copy(back_path, output_name)
+                convert_to_cmyk_icc("./list.tiff", output_name)
+                # shutil.copy(back_path, output_name)
                 output_name = f"{card_nr:02d}_1_qrcode.tiff"
                 create_qr_card_cmyk(decklist_url, output_name)
 
