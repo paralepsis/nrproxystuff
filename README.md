@@ -6,7 +6,8 @@ netrunnerDB and spits out a PDF ready for submission to DriveThruCards.com.
 
 ## Details:
 - Caches images in ~/nrdb-cache to speed processing of multiple lists.
-- Includes an additional card with a QR code pointing to the netrunnerDB decklist, for reference.
+- Includes an additional card with a QR code pointing to the netrunnerDB decklist, for
+  reference, as well as the decklist itself.
 - By default uses some unencumbered card backs I generated, but it's easy to pick your own.
 - Uses ImageMagick for conversion to TIFF format, addition of black border, and CMYK format.
 - Uses GhostScript to deduplicate the PDF, shrinking a good bit.
