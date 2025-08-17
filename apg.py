@@ -212,7 +212,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "magick",
         input_path,
         "-resize", "750x1050",
-        "-filter", "Mitchell", # Lanczo, Robidoux, Mitchell, Catrom
+        "-filter", "Mitchell", # Lanczos, RobidouxSharp, Mitchell, Catrom
         "-bordercolor", "black",
         "-units", "PixelsPerInch",
         "-border", "38x38",
