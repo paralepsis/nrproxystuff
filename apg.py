@@ -323,7 +323,8 @@ def create_qr_card_cmyk(data, output_path, dpi=300):
     card = Image.new("CMYK", card_px, (0, 0, 0, 0))  # CMYK white
 
     # 4) Rich black swatch in CMYK: C=60%, M=40%, Y=40%, K=100% → scale 0..255
-    rich_black = (int(0.60*255), int(0.40*255), int(0.40*255), 255)
+    # rich_black = (int(0.60*255), int(0.40*255), int(0.40*255), 255)
+    rich_black = (0,0,0,255)
 
     # Create a solid CMYK tile the size of the QR
     qr_tile = Image.new("CMYK", (qr_target, qr_target), rich_black)
