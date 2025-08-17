@@ -16,26 +16,26 @@ def _section_order_for_side(side):
     if side == "corp":
         # Common Corp order
         return [
+            ("identity", "Identity"),
             ("agenda",   "Agendas"),
             ("asset",    "Assets"),
             ("operation","Operations"),
             ("upgrade",  "Upgrades"),
             ("ice",      "ICE"),
-            ("identity", "Identity"),
         ]
     # Runner order
     return [
+        ("identity",   "Identity"),
         ("event",      "Events"),
         ("hardware",   "Hardware"),
         ("resource",   "Resources"),
         ("program",    "Programs"),
         ("icebreaker", "Icebreakers"),
-        ("identity",   "Identity"),
     ]
 
 def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
                                       dpi=300, size_in=(2.75, 3.75),
-                                      two_columns=True, min_body_pt=7, max_body_pt=7):
+                                      two_columns=True, body_pt=7):
     """
     card_meta: dict { card_id: { 'title': str, 'type_code': str, 'count': int } }
     """
@@ -49,9 +49,8 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
         "/System/Library/Fonts/Supplemental/Helvetica.ttc",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
-    title_font = _try_load_font(preferred_fonts, _pt(16, dpi))
-    header_font = _try_load_font(preferred_fonts, _pt(12, dpi))
-    # body font picked dynamically
+    header_font = _try_load_font(preferred_fonts, _pt(10, dpi))
+    body_font   = _try_load_font(preferred_fonts, _pt(body_pt, dpi))
 
     M  = _pt(12, dpi)    # outer margin
     G  = _pt(10, dpi)    # column gutter
@@ -59,8 +58,6 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
     k  = (0,0,0,255)
     k60= (0,0,0,int(255*0.6))
 
-    draw.text((M, y), deck_name, fill=k, font=title_font)
-    y += title_font.getbbox(deck_name)[3] - title_font.getbbox(deck_name)[1] + _pt(6, dpi)
     draw.line([(M, y), (W-M, y)], fill=k60, width=1)
     y += _pt(6, dpi)
 
@@ -99,46 +96,7 @@ def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
     col_x = [M, M + col_w + G][:col_count]
     usable_height = H - M - y
 
-    def layout_height(body_font):
-        heights = [0]*col_count
-        for kind, text in sections:
-            if kind == "__HEADER__":
-                fh = header_font.getbbox("Ag")[3] - header_font.getbbox("Ag")[1]
-                block_h = fh + _pt(3, dpi)
-            else:
-                fh = body_font.getbbox("Ag")[3] - body_font.getbbox("Ag")[1]
-                # simple wrap to column width
-                wrap = []
-                words = text.split()
-                cur = ""
-                for w in words:
-                    t = (cur + " " + w).strip()
-                    if (body_font.getbbox(t)[2] - body_font.getbbox(t)[0]) <= (col_w - _pt(2, dpi)):
-                        cur = t
-                    else:
-                        if cur: wrap.append(cur)
-                        cur = w
-                if cur: wrap.append(cur)
-                block_h = fh*len(wrap) + _pt(2, dpi)
-
-            # put into shortest column
-            i = min(range(col_count), key=lambda j: heights[j])
-            if heights[i] + block_h > usable_height:
-                return None  # overflow
-            heights[i] += block_h
-        return max(heights)
-
-    # Find largest font size that fits
-    body_font = None
-    for pt in range(max_body_pt, min_body_pt-1, -1):
-        f = _try_load_font(preferred_fonts, _pt(pt, dpi))
-        if layout_height(f) is not None:
-            body_font = f
-            break
-    if body_font is None:
-        body_font = _try_load_font(preferred_fonts, _pt(min_body_pt, dpi))
-
-    # Draw for real
+    # Draw
     col_heights = [0]*col_count
     col_y = [y]*col_count
     for kind, text in sections:
