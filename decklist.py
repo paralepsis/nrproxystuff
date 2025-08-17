@@ -35,7 +35,7 @@ def _section_order_for_side(side):
 
 def create_decklist_card_grouped_cmyk(card_meta, side, output_path,
                                       dpi=300, size_in=(2.75, 3.75),
-                                      two_columns=True, body_pt=7):
+                                      two_columns=True, body_pt=8):
     """
     card_meta: dict { card_id: { 'title': str, 'type_code': str, 'count': int } }
     """
