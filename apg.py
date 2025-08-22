@@ -18,7 +18,8 @@ base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "backs/chatgpt-runner-back.tiff"
 corp_back    = "backs/chatgpt-corp-back.tiff"
 rgb_profile  = "../ECI-RGB.V1.0.icc"
-cmyk_profile = "../ISOcoated_v2_eci.icc"
+# cmyk_profile = "../ISOcoated_v2_eci.icc"
+cmyk_profile = "../CGATS21_CRPC1.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 
 usage = 'ANRProxyGenerator.py -d <deck id>'
@@ -139,7 +140,8 @@ def main(argv):
                 convert_to_cmyk_icc("./list.tiff", output_name)
                 # shutil.copy(back_path, output_name)
                 output_name = f"{card_nr:02d}_1_qrcode.tiff"
-                create_qr_card_cmyk(decklist_url, output_name)
+                decklist_human = f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}"
+                create_qr_card_cmyk(decklist_human, output_name)
 
                 print("Adding backs.")
                 for i in range(1,card_nr+1):
@@ -212,7 +214,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "magick",
         input_path,
         "-resize", "750x1050",
-        "-filter", "Mitchell", # Lanczos, RobidouxSharp, Mitchell, Catrom
+        "-filter", "Lanczos", # Lanczos, RobidouxSharp, Mitchell, Catrom
         "-bordercolor", "black",
         "-units", "PixelsPerInch",
         "-border", "38x38",

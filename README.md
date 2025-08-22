@@ -31,10 +31,14 @@ pip install qrcode[pil]
 ```
 
 ## ICC Files
-Found here:
+DriveThruCards provides one for the CMYK side:
+- https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc
+
+Others found here:
 - https://www.eci.org/doku.php?id=en:downloads
 - You want ecirgbv10.zip and ecu_offset_2009.zip.
 - From those you can grab ECI-RGB.V1.0.icc and ISOcoated_v2_eci.icc (respectively).
+- Actually ISOcoated_v2_eci.icc allows 330% coverage, which is too much -- test deck v. saturated.
 
 ## Card Backs
 There are some card backs provided. I generated them with ChatGPT5. The corp back uses an image found here:
@@ -44,8 +48,5 @@ It's free for personal use.
 
 Converted to correct format with something like this:
 ```
-magick ./chatgpt-corp.png -resize 750x1050 -bordercolor black -border 38x38
--units PixelsPerInch -density 300 -profile ../../ECI-RGB.V1.0.icc
--profile ../../ISOcoated_v2_eci.icc -filter Mitchell -compress Zip
-./chatgpt-corp.tiff
+magick ./chatgpt-runner-back.png -resize 750x1050 -bordercolor black -border 38x38 -units PixelsPerInch -density 300 -profile ../../ECI-RGB.V1.0.icc -profile ../../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-runner-back.tiff
 ```
