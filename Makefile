@@ -1,0 +1,2 @@
+clean::
+	rm *.tiff *.pdf
