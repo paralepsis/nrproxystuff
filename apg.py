@@ -134,21 +134,22 @@ def main(argv):
 
                 print("All cards downloaded and converted.")
 
-                print("Adding decklist card.")
-                create_decklist_card_grouped_cmyk(card_meta, side, "./list.tiff")
-                output_name = f"{card_nr:02d}_0_back.tiff"
-                convert_to_cmyk_icc("./list.tiff", output_name)
-                # shutil.copy(back_path, output_name)
-                output_name = f"{card_nr:02d}_1_qrcode.tiff"
-                decklist_human = f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}"
-                create_qr_card_cmyk(decklist_human, output_name)
-
                 print("Adding backs.")
                 for i in range(1,card_nr+1):
                     output_name = f"{i:02d}_0_back.tiff"
                     shutil.copy(back_path, output_name)
                     # print(f"  {output_name}")
 
+                print("Adding decklist card.")
+                output_name = f"{card_nr:02d}_0_list.tiff"
+                create_decklist_card_grouped_cmyk(card_meta, side, output_name)
+                # create_decklist_card_grouped_cmyk(card_meta, side, "./list.tiff")
+                # convert_to_cmyk_icc("./list.tiff", output_name)
+                # os.remove("./list.tiff")
+
+                output_name = f"{card_nr:02d}_1_qrcode.tiff"
+                decklist_human = f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}"
+                create_qr_card_cmyk(decklist_human, output_name)
 
                 tiffs_to_cmyk_pdf(".", "./deck-pre.pdf")
                 dedup_pdf("./deck-pre.pdf", "./deck.pdf");
