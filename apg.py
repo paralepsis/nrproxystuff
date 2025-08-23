@@ -217,6 +217,7 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-resize", "750x1050",
         "-filter", "Lanczos", # Lanczos, RobidouxSharp, Mitchell, Catrom
         "-bordercolor", "black",
+        "-sharpen", "0x0.5",
         "-units", "PixelsPerInch",
         "-border", "38x38",
         "-density", "300",
