@@ -31,8 +31,14 @@ pip install qrcode[pil]
 ```
 
 ## ICC Files
+You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace.
 DriveThruCards provides one for the CMYK side:
 - https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc
+
+This [Reddit post](https://www.reddit.com/r/mpcproxies/comments/1axn285/updated_drivethrucards_guide/)
+suggests that maybe sRGB_v4_ICC_preference.icc is the best to use
+on the RGB side of things, which can be found here:
+- https://www.color.org/srgbprofiles.xalter#v4pref
 
 Others found here:
 - https://www.eci.org/doku.php?id=en:downloads
@@ -42,7 +48,7 @@ Others found here:
 
 ## Card Backs
 There are some card backs provided. I generated them with ChatGPT5. The corp back uses an image found here:
-  https://www.clipartmax.com/middle/m2i8A0Z5m2N4A0A0_company-corporation-factory-icon-company-corporation-factory-icon/
+-  https://www.clipartmax.com/middle/m2i8A0Z5m2N4A0A0_company-corporation-factory-icon-company-corporation-factory-icon/
 
 It's free for personal use.
 
