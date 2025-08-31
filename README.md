@@ -40,11 +40,8 @@ suggests that maybe sRGB_v4_ICC_preference.icc is the best to use
 on the RGB side of things, which can be found here:
 - https://www.color.org/srgbprofiles.xalter#v4pref
 
-Others found here:
+ChatGPT5 says that I'm better off with the ECI-RGB.V1.0.icc, found in ecirgbv10.zip here:
 - https://www.eci.org/doku.php?id=en:downloads
-- You want ecirgbv10.zip and ecu_offset_2009.zip.
-- From those you can grab ECI-RGB.V1.0.icc and ISOcoated_v2_eci.icc (respectively).
-- Actually ISOcoated_v2_eci.icc allows 330% coverage, which is too much -- test deck v. saturated.
 
 ## Card Backs
 There are some card backs provided. I generated them with ChatGPT5. The corp back uses an image found here:
