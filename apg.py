@@ -17,10 +17,11 @@ from decklist import create_decklist_card_grouped_cmyk
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "backs/chatgpt-runner-back.tiff"
 corp_back    = "backs/chatgpt-corp-back.tiff"
-rgb_profile  = "../ECI-RGB.V1.0.icc"
+# rgb_profile  = "../ECI-RGB.V1.0.icc"
+rgb_profile  = "../sRGB_v4_ICC_preference.icc"
 # cmyk_profile = "../ISOcoated_v2_eci.icc"
-# cmyk_profile = "../CGATS21_CRPC1.icc"
-cmyk_profile = "../ISOcoated_v2_300_eci.icc"
+cmyk_profile = "../CGATS21_CRPC1.icc"
+# cmyk_profile = "../ISOcoated_v2_300_eci.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 
 usage = 'ANRProxyGenerator.py -d <deck id>'
@@ -211,6 +212,9 @@ def get_card_front(card_id, session, cache_path):
 
     return True
 
+#
+# Note from Reddit post: We recommend that images be 819 x 1114 pixel JPEG files in CMYK not RGB color format.
+#
 def convert_to_cmyk_icc(input_path, output_path):
     subprocess.run([
         "magick",
