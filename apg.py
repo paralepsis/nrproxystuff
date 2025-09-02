@@ -212,14 +212,11 @@ def get_card_front(card_id, session, cache_path):
 
     return True
 
-#
-# Note from Reddit post: We recommend that images be 819 x 1114 pixel JPEG files in CMYK not RGB color format.
-#
 def convert_to_cmyk_icc(input_path, output_path):
     subprocess.run([
         "magick",
         input_path,
-        "-resize", "750x1050",
+        "-resize", "749x1049", # was 750x1050
         "-filter", "Lanczos", # Lanczos, RobidouxSharp, Mitchell, Catrom
         "-bordercolor", "black",
         "-sharpen", "0x0.5",
