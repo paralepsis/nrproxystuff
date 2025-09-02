@@ -19,7 +19,8 @@ runner_back  = "backs/chatgpt-runner-back.tiff"
 corp_back    = "backs/chatgpt-corp-back.tiff"
 rgb_profile  = "../ECI-RGB.V1.0.icc"
 # cmyk_profile = "../ISOcoated_v2_eci.icc"
-cmyk_profile = "../CGATS21_CRPC1.icc"
+# cmyk_profile = "../CGATS21_CRPC1.icc"
+cmyk_profile = "../ISOcoated_v2_300_eci.icc"
 cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
 
 usage = 'ANRProxyGenerator.py -d <deck id>'

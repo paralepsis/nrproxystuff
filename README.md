@@ -32,8 +32,17 @@ pip install qrcode[pil]
 
 ## ICC Files
 You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace.
+
 DriveThruCards provides one for the CMYK side:
 - https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc
+
+However I found that one to result in washed out colors.
+
+Previously I had tried ISOcoated_v2_eci.icc from eci_offset_2009.zip, which can be found here:
+- https://www.eci.org/doku.php?id=en:downloads
+
+That version seems to be oversaturated (it's 330% TAC).
+I'm going to try ISOcoated_v2_300_eci.icc next (300% TAC).
 
 This [Reddit post](https://www.reddit.com/r/mpcproxies/comments/1axn285/updated_drivethrucards_guide/)
 suggests that maybe sRGB_v4_ICC_preference.icc is the best to use
