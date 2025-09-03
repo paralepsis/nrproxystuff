@@ -62,3 +62,9 @@ Converted to correct format with something like this:
 ```
 magick ./chatgpt-runner-back.png -resize 750x1050 -bordercolor black -border 38x38 -units PixelsPerInch -density 300 -profile ../../ECI-RGB.V1.0.icc -profile ../../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-runner-back.tiff
 ```
+
+## Experiments
+
+750x1050 + Mitchell + ECI-RGB.V1.0.icc + ISOcoated_v2_eci.icc -> oversaturated.
+750x1050 + Lanczos + sharp + ECI-RGB.V1.0.icc + CGATS21_CRPC1.icc -> undersaturated / washed out.
+749x1049 + Lanczos + sharp + sRGB_v4_ICC_preference.icc + CGATS21_CRPC1.icc

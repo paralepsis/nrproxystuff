@@ -137,7 +137,7 @@ def main(argv):
                 print("All cards downloaded and converted.")
 
                 print("Adding backs.")
-                for i in range(1,card_nr+1):
+                for i in range(1,card_nr):
                     output_name = f"{i:02d}_0_back.tiff"
                     shutil.copy(back_path, output_name)
                     # print(f"  {output_name}")
