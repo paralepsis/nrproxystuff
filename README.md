@@ -31,7 +31,10 @@ pip install qrcode[pil]
 ```
 
 ## ICC Files
-You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace.
+You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace. Notes below, but my suggestion is to:
+- Use sRGB_v4_ICC_preference.icc for source.
+- Use CGATS21_CRPC1.icc for target.
+- Put these in the directory above the source directory, and it'll find them.
 
 DriveThruCards provides one for the CMYK side:
 - https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc
@@ -66,5 +69,5 @@ magick ./chatgpt-runner-back.png -resize 750x1050 -bordercolor black -border 38x
 ## Experiments
 
 750x1050 + Mitchell + ECI-RGB.V1.0.icc + ISOcoated_v2_eci.icc -> oversaturated.
-750x1050 + Lanczos + sharp + ECI-RGB.V1.0.icc + CGATS21_CRPC1.icc -> undersaturated / washed out.
-749x1049 + Lanczos + sharp + sRGB_v4_ICC_preference.icc + CGATS21_CRPC1.icc
+750x1050 + Lanczos + sharpen (0x0.5) + ECI-RGB.V1.0.icc + CGATS21_CRPC1.icc -> undersaturated / washed out.
+749x1049 + Lanczos + sharpen (0x0.5) + sRGB_v4_ICC_preference.icc + CGATS21_CRPC1.icc -> good enough.
