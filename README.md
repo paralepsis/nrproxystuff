@@ -39,7 +39,7 @@ You need two, one for the RGB (source) colorspace and one for the CMYK (target) 
 DriveThruCards provides one for the CMYK side:
 - https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc
 
-However I found that one to result in washed out colors.
+I've tried other options, it seems to work best.
 
 Previously I had tried ISOcoated_v2_eci.icc from eci_offset_2009.zip, which can be found here:
 - https://www.eci.org/doku.php?id=en:downloads
