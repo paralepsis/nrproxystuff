@@ -2,7 +2,7 @@
 Me hacking on a Netrunner proxy card project. Takes a deck ID from
 netrunnerDB and spits out a PDF ready for submission to DriveThruCards.com.
 
-*Or, I think it does ... waiting on my first order.*
+I've done a few runs of this now. Color and saturation are good (not identical), clarity is good (could be clearer), but my assessment is "totally usable". 
 
 ## Details:
 - Caches images in ~/nrdb-cache to speed processing of multiple lists.
