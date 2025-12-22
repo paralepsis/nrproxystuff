@@ -63,11 +63,11 @@ It's free for personal use.
 
 Converted to correct format with something like this:
 ```
-magick ./chatgpt-runner-back.png -resize 750x1050 -bordercolor black -border 38x38 -units PixelsPerInch -density 300 -profile ../../ECI-RGB.V1.0.icc -profile ../../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-runner-back.tiff
+magick ./backs/chatgpt-corp-back.png -resize 750x1050^ -extent 750x1050 -bordercolor black -border 38x38 -units PixelsPerInch -density 300 -profile ../ECI-RGB.V1.0.icc -profile ../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-corp-back.tiff
 ```
 
 ## Experiments
 
-750x1050 + Mitchell + ECI-RGB.V1.0.icc + ISOcoated_v2_eci.icc -> oversaturated.
-750x1050 + Lanczos + sharpen (0x0.5) + ECI-RGB.V1.0.icc + CGATS21_CRPC1.icc -> undersaturated / washed out.
-749x1049 + Lanczos + sharpen (0x0.5) + sRGB_v4_ICC_preference.icc + CGATS21_CRPC1.icc -> good enough.
+- 750x1050 + Mitchell + ECI-RGB.V1.0.icc + ISOcoated_v2_eci.icc -> oversaturated.
+- 750x1050 + Lanczos + sharpen (0x0.5) + ECI-RGB.V1.0.icc + CGATS21_CRPC1.icc -> undersaturated / washed out.
+- 749x1049 + Lanczos + sharpen (0x0.5) + sRGB_v4_ICC_preference.icc + CGATS21_CRPC1.icc -> good enough.

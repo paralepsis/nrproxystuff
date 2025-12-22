@@ -31,16 +31,19 @@ def main(argv):
     add_qr    = False
     back_path = ""
     side      = ""
+    xl_img    = True
     card_meta = {}
 
     try:
-        opts, args = getopt.getopt(argv, 'd:b:rcq', ["qrcode","deckid=","back="]) #Get the deck id from the command line
+        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back="]) #Get the deck id from the command line
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
                 deck_id = arg
             elif opt == "-r":
                 back_path = runner_back
+            elif opt == "-x":
+                xl_img = True
             elif opt == "-c":
                 back_path = corp_back
             elif opt in ("-b", "--back"):
@@ -104,19 +107,19 @@ def main(argv):
                                 else:
                                     cache_name  = f"{cache_path}/{card_id}.tiff"
                                     output_name = f"00_0_{sanitized_title}.tiff"
-                                    get_card_front(card_id, session, cache_path)
+                                    get_card_front(card_id, session, cache_path, xl_img)
                                     shutil.copy(cache_name, output_name)
                                     # print(f"  {output_name} (dup)")
 
                                 # Normal front of identity card
                                 cache_name  = f"{cache_path}/{card_id}.tiff"
                                 output_name = f"00_1_{sanitized_title}.tiff"
-                                get_card_front(card_id, session, cache_path)
+                                get_card_front(card_id, session, cache_path, xl_img)
                                 shutil.copy(cache_name, output_name)
                                 # print(f"  {output_name}")
 
                             else:
-                                get_card_front(card_id, session, cache_path)
+                                get_card_front(card_id, session, cache_path, xl_img)
 
                                 for i in range(number):
                                     # output_name = f"{card_nr:02d}_0_back.tiff"
@@ -154,7 +157,8 @@ def main(argv):
                 create_qr_card_cmyk(decklist_human, output_name)
 
                 tiffs_to_cmyk_pdf(".", "./deck-pre.pdf")
-                dedup_pdf("./deck-pre.pdf", "./deck.pdf");
+                deck_name = f"./deck-{deck_id}.pdf"
+                dedup_pdf("./deck-pre.pdf", deck_name)
 
 
 
@@ -190,13 +194,21 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
     print(f"Saved to {output_pdf}")
 
 
-def get_card_front(card_id, session, cache_path):
-    nrdb_file      = f"{cache_path}/{card_id}.jpg"
+def get_card_front(card_id, session, cache_path, xl_img):
+    if not xl_img:
+        nrdb_file      = f"{cache_path}/{card_id}.jpg"
+    else:
+        nrdb_file      = f"{cache_path}/{card_id}.webp"
+
     converted_file = f"{cache_path}/{card_id}.tiff"
 
     if not os.path.exists(nrdb_file):
-        print(f"    Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
-        image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+        if not xl_img:
+            print(f"    Getting https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg.")
+            image_response = session.get(f"https://card-images.netrunnerdb.com/v2/large/{card_id}.jpg")
+        else:
+            print(f"    Getting https://card-images.netrunnerdb.com/v2/xlarge/{card_id}.webp.")
+            image_response = session.get(f"https://card-images.netrunnerdb.com/v2/xlarge/{card_id}.webp")
         if image_response.status_code == 200:
             dpi     = (300, 300)
             size_in = (2.5, 3.5)
