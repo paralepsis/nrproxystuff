@@ -228,12 +228,13 @@ def convert_to_cmyk_icc(input_path, output_path):
     subprocess.run([
         "magick",
         input_path,
-        "-resize", "749x1049", # was 750x1050
+        "-resize", "785x1100", # was 750x1050, then 749x1050 (adding 10px/side)
         "-filter", "Lanczos", # Lanczos, RobidouxSharp, Mitchell, Catrom
-        "-bordercolor", "black",
+        "-background", "black",
+	"-gravity", "center",
+	"-extent", "825x1125",
         "-sharpen", "0x0.5",
         "-units", "PixelsPerInch",
-        "-border", "38x38",
         "-density", "300",
         "-profile", rgb_profile,
         "-profile", cmyk_profile,

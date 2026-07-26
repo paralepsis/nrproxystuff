@@ -2,6 +2,8 @@
 Me hacking on a Netrunner proxy card project. Takes a deck ID from
 netrunnerDB and spits out a PDF ready for submission to DriveThruCards.com.
 
+US poker is the target size.
+
 I've done a few runs of this now. Color and saturation are good (not identical), clarity is good (could be clearer), but my assessment is "totally usable". 
 
 ## Details:
@@ -63,7 +65,7 @@ It's free for personal use.
 
 Converted to correct format with something like this:
 ```
-magick ./backs/chatgpt-corp-back.png -resize 750x1050^ -extent 750x1050 -bordercolor black -border 38x38 -units PixelsPerInch -density 300 -profile ../ECI-RGB.V1.0.icc -profile ../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-corp-back.tiff
+magick ./backs/chatgpt-corp-back.png -resize 785x1100^ -gravity center -background black -extent 825x1125 -units PixelsPerInch -density 300 -profile ../ECI-RGB.V1.0.icc -profile ../CGATS21_CRPC1.icc -filter Mitchell -compress Zip ./chatgpt-corp-back.tiff
 ```
 
 ## Experiments
