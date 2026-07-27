@@ -12,19 +12,19 @@ import math
 import sys
 import getopt
 import re
+import tempfile
 from decklist import create_decklist_card_grouped_cmyk
 
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
 runner_back  = "backs/chatgpt-runner-back.tiff"
 corp_back    = "backs/chatgpt-corp-back.tiff"
-# rgb_profile  = "../ECI-RGB.V1.0.icc"
-rgb_profile  = "../sRGB_v4_ICC_preference.icc"
-# cmyk_profile = "../ISOcoated_v2_eci.icc"
-cmyk_profile = "../CGATS21_CRPC1.icc"
-# cmyk_profile = "../ISOcoated_v2_300_eci.icc"
-cache_path   = "/Volumes/HomeX/rbross/nrdb-cache/"
+rgb_profile_name = "sRGB_v4_ICC_preference.icc"
+cmyk_profile_name = "CGATS21_CRPC1.icc"
+rgb_profile_url = "https://registry.color.org/rgb-registry/profiles/sRGB_v4_ICC_preference.icc"
+cmyk_profile_url = "https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc"
+default_cache_path = Path.home() / "nrdb-cache"
 
-usage = 'ANRProxyGenerator.py -d <deck id>'
+usage = 'ANRProxyGenerator.py -d <deck id> [--cache <cache path>]'
 
 def main(argv):
     deck_id   = -1
@@ -33,9 +33,10 @@ def main(argv):
     side      = ""
     xl_img    = True
     card_meta = {}
+    cache_path = default_cache_path
 
     try:
-        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back="]) #Get the deck id from the command line
+        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back=", "cache="]) #Get the deck id from the command line
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
@@ -48,10 +49,16 @@ def main(argv):
                 back_path = corp_back
             elif opt in ("-b", "--back"):
                 back_path = arg
+            elif opt == "--cache":
+                cache_path = Path(arg).expanduser()
             elif opt in ("-q", "--qrcode"):
                 add_qr = True
             else:
                 print ("Unsupported argument found!")
+
+        cache_path.mkdir(parents=True, exist_ok=True)
+        rgb_profile = ensure_profile(Path.cwd() / rgb_profile_name, rgb_profile_url)
+        cmyk_profile = ensure_profile(Path.cwd() / cmyk_profile_name, cmyk_profile_url)
 
         with requests.Session() as session:
 
@@ -64,8 +71,10 @@ def main(argv):
             if deck_response.status_code == 200:
                 deck_data = deck_response.json()
                 card_nr = 1 # count for printing purposes, 0 reserved for identity
+                build_dir = Path(tempfile.mkdtemp(prefix=f"nrproxystuff-{deck_id}-"))
 
                 print(f"Selected {deck_data['data'][0]['name']}.")
+                print(f"Building PDF assets in {build_dir}.")
 
                 for card_id, number in deck_data['data'][0]['cards'].items():
                     # note: human-centric page is https://netrunnerdb.com/en/card/{card_id}
@@ -98,22 +107,22 @@ def main(argv):
                             if card_data['type_code'] == "identity":
                                 # Back of identity card: flipped card or duplicate of front
                                 if "Flip side:" in card_data['stripped_text']:
-                                    output_name = f"00_0_{sanitized_title}-flip.tiff"
+                                    output_name = build_dir / f"00_0_{sanitized_title}-flip.tiff"
                                     flip_id = f"{card_id}-0"
-                                    cache_name  = f"{cache_path}/{flip_id}.tiff"
-                                    get_card_front(flip_id, session, cache_path)
+                                    cache_name  = cache_path / f"{flip_id}.tiff"
+                                    get_card_front(flip_id, session, cache_path, xl_img)
                                     shutil.copy(cache_name, output_name)
                                     # print(f"  {output_name} (flipped)")
                                 else:
-                                    cache_name  = f"{cache_path}/{card_id}.tiff"
-                                    output_name = f"00_0_{sanitized_title}.tiff"
+                                    cache_name  = cache_path / f"{card_id}.tiff"
+                                    output_name = build_dir / f"00_0_{sanitized_title}.tiff"
                                     get_card_front(card_id, session, cache_path, xl_img)
                                     shutil.copy(cache_name, output_name)
                                     # print(f"  {output_name} (dup)")
 
                                 # Normal front of identity card
-                                cache_name  = f"{cache_path}/{card_id}.tiff"
-                                output_name = f"00_1_{sanitized_title}.tiff"
+                                cache_name  = cache_path / f"{card_id}.tiff"
+                                output_name = build_dir / f"00_1_{sanitized_title}.tiff"
                                 get_card_front(card_id, session, cache_path, xl_img)
                                 shutil.copy(cache_name, output_name)
                                 # print(f"  {output_name}")
@@ -126,8 +135,8 @@ def main(argv):
                                     # shutil.copy(back_path, output_name)
                                     # print(f"  {output_name}")
 
-                                    cache_name  = f"{cache_path}/{card_id}.tiff"
-                                    output_name = f"{card_nr:02d}_1_{sanitized_title}.tiff"
+                                    cache_name  = cache_path / f"{card_id}.tiff"
+                                    output_name = build_dir / f"{card_nr:02d}_1_{sanitized_title}.tiff"
                                     shutil.copy(cache_name, output_name)
                                     # print(f"  {output_name}")
                                     # inefficient, but effective way to add QR code
@@ -141,24 +150,25 @@ def main(argv):
 
                 print("Adding backs.")
                 for i in range(1,card_nr):
-                    output_name = f"{i:02d}_0_back.tiff"
+                    output_name = build_dir / f"{i:02d}_0_back.tiff"
                     shutil.copy(back_path, output_name)
                     # print(f"  {output_name}")
 
                 print("Adding decklist card.")
-                output_name = f"{card_nr:02d}_0_list.tiff"
+                output_name = build_dir / f"{card_nr:02d}_0_list.tiff"
                 create_decklist_card_grouped_cmyk(card_meta, side, output_name)
                 # create_decklist_card_grouped_cmyk(card_meta, side, "./list.tiff")
                 # convert_to_cmyk_icc("./list.tiff", output_name)
                 # os.remove("./list.tiff")
 
-                output_name = f"{card_nr:02d}_1_qrcode.tiff"
+                output_name = build_dir / f"{card_nr:02d}_1_qrcode.tiff"
                 decklist_human = f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}"
                 create_qr_card_cmyk(decklist_human, output_name)
 
-                tiffs_to_cmyk_pdf(".", "./deck-pre.pdf")
-                deck_name = f"./deck-{deck_id}.pdf"
-                dedup_pdf("./deck-pre.pdf", deck_name)
+                deck_pre_pdf = build_dir / "deck-pre.pdf"
+                tiffs_to_cmyk_pdf(build_dir, deck_pre_pdf)
+                deck_name = Path(f"./deck-{deck_id}.pdf")
+                dedup_pdf(deck_pre_pdf, deck_name, cmyk_profile)
 
 
 
@@ -186,7 +196,7 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
         # "-colorspace", "CMYK",             # preserve CMYK
         "-compress", "Zip",                # good quality
         "-density", "300",                 # DPI for print
-        f"PDF:{output_pdf}"
+        f"PDF:{str(output_pdf)}"
     ]
 
     print("Running:", " ".join(command))
@@ -194,13 +204,24 @@ def tiffs_to_cmyk_pdf(input_dir, output_pdf):
     print(f"Saved to {output_pdf}")
 
 
+def ensure_profile(profile_path, profile_url):
+    if profile_path.exists():
+        return profile_path
+
+    print(f"Downloading {profile_path.name}.")
+    response = requests.get(profile_url)
+    response.raise_for_status()
+    profile_path.write_bytes(response.content)
+    return profile_path
+
+
 def get_card_front(card_id, session, cache_path, xl_img):
     if not xl_img:
-        nrdb_file      = f"{cache_path}/{card_id}.jpg"
+        nrdb_file      = cache_path / f"{card_id}.jpg"
     else:
-        nrdb_file      = f"{cache_path}/{card_id}.webp"
+        nrdb_file      = cache_path / f"{card_id}.webp"
 
-    converted_file = f"{cache_path}/{card_id}.tiff"
+    converted_file = cache_path / f"{card_id}.tiff"
 
     if not os.path.exists(nrdb_file):
         if not xl_img:
@@ -220,14 +241,14 @@ def get_card_front(card_id, session, cache_path, xl_img):
 
     if not os.path.exists(converted_file):
         print(f"    Converting {nrdb_file} to CMYK TIFF with border.")
-        convert_to_cmyk_icc(nrdb_file, converted_file)
+        convert_to_cmyk_icc(nrdb_file, converted_file, Path.cwd() / rgb_profile_name, Path.cwd() / cmyk_profile_name)
 
     return True
 
-def convert_to_cmyk_icc(input_path, output_path):
+def convert_to_cmyk_icc(input_path, output_path, rgb_profile, cmyk_profile):
     subprocess.run([
         "magick",
-        input_path,
+        str(input_path),
         "-resize", "785x1100", # was 750x1050, then 749x1050 (adding 10px/side)
         "-filter", "Lanczos", # Lanczos, RobidouxSharp, Mitchell, Catrom
         "-background", "black",
@@ -236,10 +257,10 @@ def convert_to_cmyk_icc(input_path, output_path):
         "-sharpen", "0x0.5",
         "-units", "PixelsPerInch",
         "-density", "300",
-        "-profile", rgb_profile,
-        "-profile", cmyk_profile,
+        "-profile", str(rgb_profile),
+        "-profile", str(cmyk_profile),
         "-compress", "Zip",
-        output_path
+        str(output_path)
     ], check=True)
 
     return
@@ -359,7 +380,7 @@ def create_qr_card_cmyk(data, output_path, dpi=300):
     card.save(output_path, format="TIFF", dpi=(dpi, dpi), compression="tiff_adobe_deflate")
     # print(f"Saved QR card to {output_path}")
 
-def dedup_pdf(input_path, output_path):
+def dedup_pdf(input_path, output_path, cmyk_profile):
     cmd = [
         "gs", "-q",
         "-dBATCH",
@@ -367,14 +388,14 @@ def dedup_pdf(input_path, output_path):
         "-dNOPAUSE",
         "-sDEVICE=pdfwrite",
         "-sProcessColorModel=DeviceCMYK",
-        f"-sOutputICCProfile={cmyk_profile}",
+        f"-sOutputICCProfile={str(cmyk_profile)}",
         "-dPDFX=true",
         "-dPDFSETTINGS=/prepress",  # high quality for print
         "-dEmbedAllFonts=true",
         "-dSubsetFonts=false",
         "-dCompressFonts=true",
-        f"-sOutputFile={output_path}",
-        input_path
+        f"-sOutputFile={str(output_path)}",
+        str(input_path)
     ]
 
     subprocess.run(cmd, check=True)
@@ -390,5 +411,3 @@ if __name__ == "__main__":
         print(usage)
     else:
         main(sys.argv[1:])
-
-

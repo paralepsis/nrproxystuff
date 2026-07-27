@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local ICC profiles downloaded for PDF generation
+sRGB_v4_ICC_preference.icc
+CGATS21_CRPC1.icc
