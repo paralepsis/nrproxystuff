@@ -10,6 +10,8 @@ I've done a few runs of this now. Color and saturation are good (not identical),
 - Caches images in ~/nrdb-cache to speed processing of multiple lists.
 - Includes an additional card with a QR code pointing to the netrunnerDB decklist, for
   reference, as well as the decklist itself.
+- Can also take a local JSON deck file via `--json`; if no `source_url` is present in the JSON,
+  the decklist card is printed on both sides instead of generating a QR card.
 - By default uses some unencumbered card backs I generated, but it's easy to pick your own.
 - Uses ImageMagick for conversion to TIFF format, addition of black border, and CMYK format.
 - Uses GhostScript to deduplicate the PDF, shrinking a good bit.
@@ -50,6 +52,32 @@ magick -list configure
 ```
 
 You want to see `lcms` in the delegates list, and you do not want a build configured with `--with-lcms=no`.
+
+## JSON Input
+You can provide a deck by netrunnerDB decklist ID or by local JSON:
+```
+python apg.py -d d71397b7-af7b-475c-8984-18360a64f6ee
+python apg.py --json ./examples/d71397b7-af7b-475c-8984-18360a64f6ee.json
+```
+
+The minimal JSON shape is:
+```
+{
+  "cards": [
+    {
+      "count": 3,
+      "card_id": "30030"
+    }
+  ]
+}
+```
+
+Optional fields:
+- `name`: used for logs and output naming.
+- `source_url`: used for the QR card on the back of the decklist/reference card.
+- `cards[].name`: just for readability in the source file; card metadata still comes from `card_id`.
+
+If `source_url` is omitted, the tool duplicates the decklist card on both sides instead of generating a QR card.
 
 ## ICC Files
 You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace. Notes below, but my suggestion is to:
