@@ -14,6 +14,7 @@ import getopt
 import re
 import tempfile
 import json
+import xml.etree.ElementTree as ET
 from decklist import create_decklist_card_grouped_cmyk
 
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
@@ -26,24 +27,27 @@ cmyk_profile_url = "https://help.drivethrupartners.com/hc/en-us/article_attachme
 default_cache_path = Path.home() / "nrdb-cache"
 
 program_name = Path(sys.argv[0]).name or "apg.py"
-usage = f'{program_name} (-d <deck id> | --json <deck json>) [--cache <cache path>]'
+usage = f'{program_name} (-d <deck id> | --json <deck json> | --octgn <deck octgn>) [--cache <cache path>]'
 
 def main(argv):
     deck_id   = None
     json_path = None
+    octgn_source = None
     add_qr    = False
     back_path = ""
     xl_img    = True
     cache_path = default_cache_path
 
     try:
-        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back=", "cache=", "json="]) #Get the deck id from the command line
+        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back=", "cache=", "json=", "octgn="]) #Get the deck id from the command line
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
                 deck_id = arg
             elif opt == "--json":
                 json_path = Path(arg).expanduser()
+            elif opt == "--octgn":
+                octgn_source = arg
             elif opt == "-r":
                 back_path = runner_back
             elif opt == "-x":
@@ -59,8 +63,9 @@ def main(argv):
             else:
                 print ("Unsupported argument found!")
 
-        if (deck_id is None) == (json_path is None):
-            print("Error: provide exactly one of --deckid or --json")
+        input_count = sum(value is not None for value in (deck_id, json_path, octgn_source))
+        if input_count != 1:
+            print("Error: provide exactly one of --deckid, --json, or --octgn")
             print(usage)
             sys.exit(2)
 
@@ -71,8 +76,10 @@ def main(argv):
         with requests.Session() as session:
             if deck_id is not None:
                 deck = load_nrdb_deck(deck_id, session)
-            else:
+            elif json_path is not None:
                 deck = load_json_deck(json_path)
+            else:
+                deck = load_octgn_deck(octgn_source, session)
 
             build_dir = Path(tempfile.mkdtemp(prefix=f"nrproxystuff-{deck['build_tag']}-"))
             print(f"Selected {deck['name']}.")
@@ -105,6 +112,7 @@ def load_nrdb_deck(deck_id, session):
     deck_data = deck_response.json()['data'][0]
     return {
         'name': deck_data['name'],
+        'deck_id': str(deck_id),
         'source_url': f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}",
         'output_stem': f"deck-{deck_id}",
         'build_tag': str(deck_id),
@@ -137,13 +145,90 @@ def load_json_deck(json_path):
         })
 
     deck_name = deck_data.get('name') or json_path.stem
+    deck_id = deck_data.get('deck_id')
+    source_url = deck_data.get('source_url') or source_url_from_deck_id(deck_id)
     return {
         'name': deck_name,
-        'source_url': deck_data.get('source_url'),
+        'deck_id': deck_id,
+        'source_url': source_url,
         'output_stem': f"deck-{sanitize_filename(deck_name) or sanitize_filename(json_path.stem) or 'json'}",
         'build_tag': sanitize_filename(deck_name) or sanitize_filename(json_path.stem) or 'json',
         'cards': normalized_cards,
     }
+
+
+def load_octgn_deck(octgn_source, session):
+    octgn_url = octgn_source if is_url(octgn_source) else None
+    nrdb_deck_id = nrdb_deck_id_from_octgn_url(octgn_url) if octgn_url else None
+    if nrdb_deck_id is not None:
+        return load_nrdb_deck(nrdb_deck_id, session)
+
+    if octgn_url is not None:
+        print(f"Loading OCTGN deck from {octgn_url}")
+        response = session.get(octgn_url)
+        response.raise_for_status()
+        octgn_text = response.text
+        source_url = octgn_url
+        source_stem = octgn_url.rstrip('/').split('/')[-1] or 'octgn'
+    else:
+        octgn_path = Path(octgn_source).expanduser()
+        print(f"Loading OCTGN deck from {octgn_path}")
+        octgn_text = octgn_path.read_text()
+        source_url = None
+        source_stem = octgn_path.stem
+
+    cards = parse_octgn_cards(octgn_text)
+    deck_name = sanitize_filename(source_stem) or 'octgn'
+    return {
+        'name': source_stem,
+        'deck_id': None,
+        'source_url': source_url,
+        'output_stem': f"deck-{deck_name}",
+        'build_tag': deck_name,
+        'cards': cards,
+    }
+
+
+def parse_octgn_cards(octgn_text):
+    root = ET.fromstring(octgn_text)
+    cards = []
+    for card in root.findall('.//card'):
+        octgn_card_id = card.attrib.get('id', '')
+        card_id = octgn_card_id_from_card_id(octgn_card_id)
+        cards.append({
+            'card_id': card_id,
+            'count': int(card.attrib['qty']),
+            'name': (card.text or '').strip() or None,
+        })
+    if not cards:
+        raise ValueError("OCTGN deck must contain at least one <card> entry")
+    return cards
+
+
+def source_url_from_deck_id(deck_id):
+    if not deck_id:
+        return None
+    return f"https://www.netrunnerdb.com/en/decklist/{deck_id}"
+
+
+def is_url(value):
+    return value.startswith("http://") or value.startswith("https://")
+
+
+def nrdb_deck_id_from_octgn_url(octgn_url):
+    if octgn_url is None:
+        return None
+    match = re.search(r'/decklist/export/octgn/([0-9a-fA-F-]+)$', octgn_url)
+    if not match:
+        return None
+    return match.group(1)
+
+
+def octgn_card_id_from_card_id(octgn_card_id):
+    match = re.search(r'(\d+)$', octgn_card_id)
+    if match is None:
+        raise ValueError(f"Could not extract NRDB card ID from OCTGN card id: {octgn_card_id}")
+    return match.group(1)
 
 
 def generate_deck(deck, session, cache_path, build_dir, back_path, xl_img, add_qr, cmyk_profile):
