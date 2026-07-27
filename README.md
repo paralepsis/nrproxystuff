@@ -25,12 +25,31 @@ I started from Ecophagy's ANRProxyGenerator:
 That code is also MIT licensed. There isn't a lot of it left, here.
 
 ## Environment
-This is what I did:
+The checked-in environment definition lives in `./environment.yml`.
+
+Create the environment with:
+```
+conda env create -f ./environment.yml
+conda activate nrproxystuff
+```
+
+Or manually, this is what I originally did:
 ```
 conda create python=3.10 requests pillow psutil
 conda install conda-forge::ghostscript
 pip install qrcode[pil]
 ```
+
+ImageMagick needs LCMS support enabled for ICC profile conversion to work correctly. If you see warnings like:
+```
+magick: delegate library support not built-in ... (LCMS)
+```
+then the profile conversion is not actually happening. A quick check is:
+```
+magick -list configure
+```
+
+You want to see `lcms` in the delegates list, and you do not want a build configured with `--with-lcms=no`.
 
 ## ICC Files
 You need two, one for the RGB (source) colorspace and one for the CMYK (target) colorspace. Notes below, but my suggestion is to:

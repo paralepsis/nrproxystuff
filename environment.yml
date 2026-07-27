@@ -1,0 +1,14 @@
+name: nrproxystuff
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - requests
+  - pillow
+  - psutil
+  - ghostscript
+  - imagemagick>=7.1.2
+  - lcms2
+  - pip
+  - pip:
+      - "qrcode[pil]"
