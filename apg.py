@@ -13,6 +13,7 @@ import sys
 import getopt
 import re
 import tempfile
+import json
 from decklist import create_decklist_card_grouped_cmyk
 
 base_url     = "https://netrunnerdb.com/api/2.0/public/decklist/"
@@ -24,23 +25,25 @@ rgb_profile_url = "https://registry.color.org/rgb-registry/profiles/sRGB_v4_ICC_
 cmyk_profile_url = "https://help.drivethrupartners.com/hc/en-us/article_attachments/12904358770455/CGATS21_CRPC1.icc"
 default_cache_path = Path.home() / "nrdb-cache"
 
-usage = 'ANRProxyGenerator.py -d <deck id> [--cache <cache path>]'
+program_name = Path(sys.argv[0]).name or "apg.py"
+usage = f'{program_name} (-d <deck id> | --json <deck json>) [--cache <cache path>]'
 
 def main(argv):
-    deck_id   = -1
+    deck_id   = None
+    json_path = None
     add_qr    = False
     back_path = ""
-    side      = ""
     xl_img    = True
-    card_meta = {}
     cache_path = default_cache_path
 
     try:
-        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back=", "cache="]) #Get the deck id from the command line
+        opts, args = getopt.getopt(argv, 'd:b:rcqx', ["qrcode","deckid=","back=", "cache=", "json="]) #Get the deck id from the command line
 
         for opt, arg in opts:
             if opt in ("-d", "--deckid"):
                 deck_id = arg
+            elif opt == "--json":
+                json_path = Path(arg).expanduser()
             elif opt == "-r":
                 back_path = runner_back
             elif opt == "-x":
@@ -56,130 +59,176 @@ def main(argv):
             else:
                 print ("Unsupported argument found!")
 
+        if (deck_id is None) == (json_path is None):
+            print("Error: provide exactly one of --deckid or --json")
+            print(usage)
+            sys.exit(2)
+
         cache_path.mkdir(parents=True, exist_ok=True)
         rgb_profile = ensure_profile(Path.cwd() / rgb_profile_name, rgb_profile_url)
         cmyk_profile = ensure_profile(Path.cwd() / cmyk_profile_name, cmyk_profile_url)
 
         with requests.Session() as session:
-
-            # print_memory_usage()
-            decklist_url = base_url + str(deck_id)
-            print(decklist_url)
-            deck_response = session.get(decklist_url)
-            # print_memory_usage()
-
-            if deck_response.status_code == 200:
-                deck_data = deck_response.json()
-                card_nr = 1 # count for printing purposes, 0 reserved for identity
-                build_dir = Path(tempfile.mkdtemp(prefix=f"nrproxystuff-{deck_id}-"))
-
-                print(f"Selected {deck_data['data'][0]['name']}.")
-                print(f"Building PDF assets in {build_dir}.")
-
-                for card_id, number in deck_data['data'][0]['cards'].items():
-                    # note: human-centric page is https://netrunnerdb.com/en/card/{card_id}
-                    #
-                    with session.get(f"https://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
-                        # print_memory_usage()
-                        if card_response.status_code == 200:
-                            card_json = card_response.json()
-                            card_data = card_json['data'][0]
-
-                            # for card list
-                            card_meta[card_id] = {'title': card_data['stripped_title'],
-                                                  'type_code': card_data['type_code'],
-                                                  'count': number}
-
-                            # print(card_data)
-                            if back_path == "":
-                                if card_data['side_code'] == "corp":
-                                    print("Autodetected corp deck.")
-                                    side = "corp"
-                                    back_path = corp_back
-                                else:
-                                    print("Autodetected runner deck.")
-                                    side = "runner"
-                                    back_path = runner_back
-
-                            print(f"  {number} x {card_data['stripped_title']} ({card_data['type_code']})")
-                            sanitized_title = sanitize_filename(card_data['stripped_title'])
-
-                            if card_data['type_code'] == "identity":
-                                # Back of identity card: flipped card or duplicate of front
-                                if "Flip side:" in card_data['stripped_text']:
-                                    output_name = build_dir / f"00_0_{sanitized_title}-flip.tiff"
-                                    flip_id = f"{card_id}-0"
-                                    cache_name  = cache_path / f"{flip_id}.tiff"
-                                    get_card_front(flip_id, session, cache_path, xl_img)
-                                    shutil.copy(cache_name, output_name)
-                                    # print(f"  {output_name} (flipped)")
-                                else:
-                                    cache_name  = cache_path / f"{card_id}.tiff"
-                                    output_name = build_dir / f"00_0_{sanitized_title}.tiff"
-                                    get_card_front(card_id, session, cache_path, xl_img)
-                                    shutil.copy(cache_name, output_name)
-                                    # print(f"  {output_name} (dup)")
-
-                                # Normal front of identity card
-                                cache_name  = cache_path / f"{card_id}.tiff"
-                                output_name = build_dir / f"00_1_{sanitized_title}.tiff"
-                                get_card_front(card_id, session, cache_path, xl_img)
-                                shutil.copy(cache_name, output_name)
-                                # print(f"  {output_name}")
-
-                            else:
-                                get_card_front(card_id, session, cache_path, xl_img)
-
-                                for i in range(number):
-                                    # output_name = f"{card_nr:02d}_0_back.tiff"
-                                    # shutil.copy(back_path, output_name)
-                                    # print(f"  {output_name}")
-
-                                    cache_name  = cache_path / f"{card_id}.tiff"
-                                    output_name = build_dir / f"{card_nr:02d}_1_{sanitized_title}.tiff"
-                                    shutil.copy(cache_name, output_name)
-                                    # print(f"  {output_name}")
-                                    # inefficient, but effective way to add QR code
-                                    if add_qr == True:
-                                        print(f"  Adding QR code.")
-                                        add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
-                                    card_nr += 1
-
-
-                print("All cards downloaded and converted.")
-
-                print("Adding backs.")
-                for i in range(1,card_nr):
-                    output_name = build_dir / f"{i:02d}_0_back.tiff"
-                    shutil.copy(back_path, output_name)
-                    # print(f"  {output_name}")
-
-                print("Adding decklist card.")
-                output_name = build_dir / f"{card_nr:02d}_0_list.tiff"
-                create_decklist_card_grouped_cmyk(card_meta, side, output_name)
-                # create_decklist_card_grouped_cmyk(card_meta, side, "./list.tiff")
-                # convert_to_cmyk_icc("./list.tiff", output_name)
-                # os.remove("./list.tiff")
-
-                output_name = build_dir / f"{card_nr:02d}_1_qrcode.tiff"
-                decklist_human = f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}"
-                create_qr_card_cmyk(decklist_human, output_name)
-
-                deck_pre_pdf = build_dir / "deck-pre.pdf"
-                tiffs_to_cmyk_pdf(build_dir, deck_pre_pdf)
-                deck_name = Path(f"./deck-{deck_id}.pdf")
-                dedup_pdf(deck_pre_pdf, deck_name, cmyk_profile)
-
-
-
-                return
+            if deck_id is not None:
+                deck = load_nrdb_deck(deck_id, session)
             else:
-                print("Error: Could not retrieve decklist")
+                deck = load_json_deck(json_path)
+
+            build_dir = Path(tempfile.mkdtemp(prefix=f"nrproxystuff-{deck['build_tag']}-"))
+            print(f"Selected {deck['name']}.")
+            print(f"Building PDF assets in {build_dir}.")
+
+            generate_deck(
+                deck,
+                session,
+                cache_path,
+                build_dir,
+                back_path,
+                xl_img,
+                add_qr,
+                cmyk_profile,
+            )
+
+            return
 
     except getopt.GetoptError as e:
         print("Error: " + str(e))
         print(usage)
         sys.exit(2)
+
+
+def load_nrdb_deck(deck_id, session):
+    decklist_url = base_url + str(deck_id)
+    print(decklist_url)
+    deck_response = session.get(decklist_url)
+    deck_response.raise_for_status()
+    deck_data = deck_response.json()['data'][0]
+    return {
+        'name': deck_data['name'],
+        'source_url': f"https://www.netrunnerdb.com/en/decklist/{str(deck_id)}",
+        'output_stem': f"deck-{deck_id}",
+        'build_tag': str(deck_id),
+        'cards': [
+            {
+                'card_id': card_id,
+                'count': count,
+                'name': None,
+            }
+            for card_id, count in deck_data['cards'].items()
+        ],
+    }
+
+
+def load_json_deck(json_path):
+    print(f"Loading deck from {json_path}")
+    deck_data = json.loads(Path(json_path).read_text())
+    cards = deck_data.get('cards')
+    if not isinstance(cards, list) or not cards:
+        raise ValueError("JSON deck must contain a non-empty 'cards' list")
+
+    normalized_cards = []
+    for card in cards:
+        if 'card_id' not in card or 'count' not in card:
+            raise ValueError("Each JSON card entry must contain 'card_id' and 'count'")
+        normalized_cards.append({
+            'card_id': str(card['card_id']),
+            'count': int(card['count']),
+            'name': card.get('name'),
+        })
+
+    deck_name = deck_data.get('name') or json_path.stem
+    return {
+        'name': deck_name,
+        'source_url': deck_data.get('source_url'),
+        'output_stem': f"deck-{sanitize_filename(deck_name) or sanitize_filename(json_path.stem) or 'json'}",
+        'build_tag': sanitize_filename(deck_name) or sanitize_filename(json_path.stem) or 'json',
+        'cards': normalized_cards,
+    }
+
+
+def generate_deck(deck, session, cache_path, build_dir, back_path, xl_img, add_qr, cmyk_profile):
+    card_nr = 1 # count for printing purposes, 0 reserved for identity
+    side = ""
+    card_meta = {}
+
+    for deck_card in deck['cards']:
+        card_id = deck_card['card_id']
+        number = deck_card['count']
+        with session.get(f"https://netrunnerdb.com/api/2.0/public/card/{card_id}") as card_response:
+            card_response.raise_for_status()
+            card_json = card_response.json()
+            card_data = card_json['data'][0]
+
+            card_meta[card_id] = {
+                'title': card_data['stripped_title'],
+                'type_code': card_data['type_code'],
+                'count': number,
+            }
+
+            if back_path == "":
+                if card_data['side_code'] == "corp":
+                    print("Autodetected corp deck.")
+                    side = "corp"
+                    back_path = corp_back
+                else:
+                    print("Autodetected runner deck.")
+                    side = "runner"
+                    back_path = runner_back
+
+            print(f"  {number} x {card_data['stripped_title']} ({card_data['type_code']})")
+            sanitized_title = sanitize_filename(card_data['stripped_title'])
+
+            if card_data['type_code'] == "identity":
+                if "Flip side:" in card_data['stripped_text']:
+                    output_name = build_dir / f"00_0_{sanitized_title}-flip.tiff"
+                    flip_id = f"{card_id}-0"
+                    cache_name = cache_path / f"{flip_id}.tiff"
+                    get_card_front(flip_id, session, cache_path, xl_img)
+                    shutil.copy(cache_name, output_name)
+                else:
+                    cache_name = cache_path / f"{card_id}.tiff"
+                    output_name = build_dir / f"00_0_{sanitized_title}.tiff"
+                    get_card_front(card_id, session, cache_path, xl_img)
+                    shutil.copy(cache_name, output_name)
+
+                cache_name = cache_path / f"{card_id}.tiff"
+                output_name = build_dir / f"00_1_{sanitized_title}.tiff"
+                get_card_front(card_id, session, cache_path, xl_img)
+                shutil.copy(cache_name, output_name)
+            else:
+                get_card_front(card_id, session, cache_path, xl_img)
+
+                for i in range(number):
+                    cache_name = cache_path / f"{card_id}.tiff"
+                    output_name = build_dir / f"{card_nr:02d}_1_{sanitized_title}.tiff"
+                    shutil.copy(cache_name, output_name)
+                    if add_qr == True:
+                        print(f"  Adding QR code.")
+                        add_qr_to_cmyk_tiff(output_name, f"https://netrunnerdb.com/en/card/{card_id}")
+                    card_nr += 1
+
+    print("All cards downloaded and converted.")
+
+    print("Adding backs.")
+    for i in range(1, card_nr):
+        output_name = build_dir / f"{i:02d}_0_back.tiff"
+        shutil.copy(back_path, output_name)
+
+    print("Adding decklist card.")
+    decklist_output = build_dir / f"{card_nr:02d}_0_list.tiff"
+    create_decklist_card_grouped_cmyk(card_meta, side, decklist_output)
+
+    reference_output = build_dir / f"{card_nr:02d}_1_qrcode.tiff"
+    if deck['source_url']:
+        create_qr_card_cmyk(deck['source_url'], reference_output)
+    else:
+        reference_output = build_dir / f"{card_nr:02d}_1_list.tiff"
+        shutil.copy(decklist_output, reference_output)
+
+    deck_pre_pdf = build_dir / "deck-pre.pdf"
+    tiffs_to_cmyk_pdf(build_dir, deck_pre_pdf)
+    deck_name = Path(f"./{deck['output_stem']}.pdf")
+    dedup_pdf(deck_pre_pdf, deck_name, cmyk_profile)
 
 def tiffs_to_cmyk_pdf(input_dir, output_pdf):
     input_path = Path(input_dir)
